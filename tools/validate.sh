@@ -62,9 +62,17 @@ run_static_checks() {
         "${test_dir}/test_demo_${demo}_runtime"
     done
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
-        tests/test_passport.c main/passport/input.c main/passport/world.c \
+        tests/test_passport.c main/passport/input.c main/passport/world.c main/passport/watering_record.c main/passport/growth.c main/passport/growth_record.c \
         -o "${test_dir}/test_passport"
     "${test_dir}/test_passport"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain -Itests/passport_storage_stubs \
+        tests/test_passport_storage.c main/passport/watering_record.c main/passport/growth.c main/passport/growth_record.c \
+        -o "${test_dir}/test_passport_storage"
+    "${test_dir}/test_passport_storage"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_passport_growth.c main/passport/growth.c main/passport/growth_record.c \
+        main/passport/watering_record.c main/passport/network_form.c -o "${test_dir}/test_passport_growth"
+    "${test_dir}/test_passport_growth"
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_deep_sleep_contract.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_check_repo.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_verify_firmware.py

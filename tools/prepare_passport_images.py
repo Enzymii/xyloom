@@ -7,14 +7,17 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "assets/images/passport"
 
 
-def descriptor(name, source, size, alpha):
+def descriptor(name, source, size, alpha, stage_height=None):
     image = Image.open(ASSETS / source).convert("RGBA" if alpha else "RGB")
     if alpha:
         # Keep new sprite proportions and anchor its actual feet/base to bottom.
-        bounds = image.getchannel("A").getbbox()
+        bounds = image.getchannel("A").point(lambda a: 255 if a >= 8 else 0).getbbox() if stage_height else image.getchannel("A").getbbox()
         if bounds is None:
             raise ValueError(f"Empty sprite: {source}")
-        sprite = ImageOps.contain(image.crop(bounds), size, Image.Resampling.LANCZOS)
+        # Earlier growth stages share the bloom's canvas and ground anchor.
+        # Their visible height is calibrated; never enlarge a seed to flower size.
+        fit = (size[0], stage_height) if stage_height else size
+        sprite = ImageOps.contain(image.crop(bounds), fit, Image.Resampling.LANCZOS)
         image = Image.new("RGBA", size, (0, 0, 0, 0))
         image.paste(sprite, ((size[0] - sprite.width) // 2, size[1] - sprite.height))
     else:
@@ -46,6 +49,9 @@ if __name__ == "__main__":
     content += descriptor("passport_world_day", "world-day-master-v2.png", (528, 320), False)
     content += descriptor("passport_momo_idle", "mochun-idle-reference-v3.png", (150, 200), True)
     content += descriptor("passport_tulip", "tulip-v2.png", (55, 65), True)
+    content += descriptor("passport_tulip_seed", "tulip-seed-v1.png", (55, 65), True, 14)
+    content += descriptor("passport_tulip_sprout", "tulip-sprout-v1.png", (55, 65), True, 28)
+    content += descriptor("passport_tulip_bud", "tulip-bud-v1.png", (55, 65), True, 50)
     content += descriptor("passport_can", "watering-can-v2.png", (60, 45), True)
     (ASSETS / "passport_images.c").write_text(content, encoding="utf-8")
-    print("Image payload: 446745 bytes in const Flash data, no full framebuffer")
+    print("Image payload: 478920 bytes in const Flash data, no full framebuffer")

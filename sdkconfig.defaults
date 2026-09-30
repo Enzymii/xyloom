@@ -31,7 +31,7 @@ CONFIG_LV_MEM_SIZE_KILOBYTES=24
 # --- 系统 ---
 CONFIG_FREERTOS_HZ=1000
 
-# Offline Milestone A does not start radio stacks.
+# Cottage uses Wi-Fi for local setup and SNTP; Bluetooth remains disabled.
 CONFIG_BT_ENABLED=n
 CONFIG_LV_TXT_ENC_UTF8=y
 CONFIG_LV_USE_FONT_PLACEHOLDER=y

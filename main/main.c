@@ -1,9 +1,12 @@
 #include "passport/input.h"
 #include "passport/world.h"
 #include "passport/view.h"
+#include "passport/storage.h"
+#include "passport/network.h"
 #include "bsp_button.h"
 #include "bsp_battery.h"
 #include <stdatomic.h>
+#include <string.h>
 #include "bsp_display.h"
 #include "bsp_pins.h"
 #include "esp_log.h"
@@ -56,6 +59,7 @@ void app_main(void) {
     passport_world_t world;
     passport_input_init(&input);
     passport_world_init(&world, (uint32_t)(esp_timer_get_time() / 1000));
+    if (!passport_storage_start()) passport_world_storage_loaded(&world, false, NULL);
     if (!bsp_lvgl_lock(1000)) {
         ESP_LOGE(TAG, "Cannot create initial view");
         return;
@@ -74,13 +78,33 @@ void app_main(void) {
     uint32_t rendered_at = 0;
     for (;;) {
         uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
+        passport_storage_result_t stored;
+        while (passport_storage_poll(&stored)) {
+            if (stored.loaded) {
+                passport_world_storage_loaded(&world, stored.success, &stored.record);
+                if (stored.success && !passport_network_start()) world.network_state = NETWORK_ERROR;
+            }
+            else passport_world_water_saved(&world, stored.success, now);
+        }
+        passport_network_status_t network;
+        if (passport_network_poll(&network)) {
+            world.network_state = network.state;
+            world.wifi_connected = network.connected;
+            world.day = network.day;
+            memcpy(world.setup_password, network.password, sizeof(world.setup_password));
+        }
         world.battery_percent = atomic_load(&s_battery);
         world.uptime_minutes = (uint32_t)(esp_timer_get_time() / 60000000);
         passport_key_t key = read_key();
         passport_input_event_t event = passport_input_sample(&input, key, now,
-            world.sleeping, world.transitioning);
+            world.sleeping, passport_world_busy(&world));
         passport_world_handle(&world, event, now);
         passport_world_tick(&world, now, key != KEY_NONE && key != KEY_INVALID);
+        passport_growth_t record;
+        if (passport_world_take_water_save(&world, &record) && !passport_storage_save(&record))
+            passport_world_water_saved(&world, false, now);
+        if (world.setup_requested) { passport_network_setup(); world.setup_requested = false; }
+        if (world.forget_requested) { passport_network_forget(); world.forget_requested = false; }
         if (world.sleeping != backlight_sleeping) {
             backlight_sleeping = world.sleeping;
             bsp_display_backlight(world.sleeping ? 0 : 80);

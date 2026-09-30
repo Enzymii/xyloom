@@ -6,7 +6,7 @@
 
 *A little world for someone to live in.*
 
-Xyloom is a small companion world. Its current app, **Cottage**, is an offline prototype for FoloToy AI Passport, with matsujun in a house-and-garden setting.
+Xyloom is a small companion world. Its current app, **Cottage**, is a companion prototype for FoloToy AI Passport, with matsujun in a house-and-garden setting.
 
 ## Names
 
@@ -21,12 +21,14 @@ Xyloom is a small companion world. Its current app, **Cottage**, is an offline p
 
 The Milestone A prototype includes the house and garden, character display, dialogs, button input, camera transitions, backlight standby, and a status page showing battery level, uptime, and character state. See the [application architecture](docs/application/passport-v0.md) for implementation boundaries and deferred work, and the [validation record](docs/application/passport-v0-validation.md) for verification status.
 
+In the garden, select the watering can and press OK to water manually. The can flies to the flower, pours, and returns. Each completed watering records one cup. The first four cups per Beijing calendar day advance the tulip: seed at 0, sprout at 4, bud at 20, bloom at 56. Today’s cups, daily quota, growth and lifetime cups survive reboot. Bloom remains visible while cup recording continues. The status page offers Wi-Fi setup through a temporary phone-accessible hotspot; the device remembers one network and synchronizes its date online. Watering waits for a trusted date after reboot. A Wi-Fi icon stays beside the battery. The UI shows today’s cups and plant progress, without lifetime cups or completed-day totals.
+
 ## Project structure
 
 | Path | Contents |
 | --- | --- |
 | `main/main.c` | Cottage startup and hardware adapter. |
-| `main/passport/` | Cottage input, world state, and view. |
+| `main/passport/` | Cottage input, world state, growth, storage, networking, and view. |
 | `assets/images/passport/`, `assets/fonts/passport/` | Application artwork and fonts. |
 | `components/bsp/` | FoloToy AI Passport board support. |
 | `docs/application/` | Prototype architecture and validation records. |

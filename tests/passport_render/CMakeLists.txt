@@ -10,7 +10,7 @@ set(CONFIG_LV_USE_THORVG_INTERNAL OFF CACHE BOOL "" FORCE)
 add_subdirectory(${LVGL_SOURCE} lvgl)
 set(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 add_executable(passport_render render.c
-    ${ROOT}/main/passport/view.c ${ROOT}/main/passport/world.c
+    ${ROOT}/main/passport/view.c ${ROOT}/main/passport/world.c ${ROOT}/main/passport/growth.c
     ${ROOT}/assets/fonts/passport/passport_font_18.c
     ${ROOT}/assets/images/passport/passport_images.c)
 target_include_directories(passport_render PRIVATE ${ROOT}/main)

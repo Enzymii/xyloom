@@ -1,0 +1,68 @@
+{
+  "status": "integrated into firmware through prepare_passport_images.py",
+  "generated_on": "2026-09-30",
+  "generator": "built-in image_gen, separate transparent-background call per stage",
+  "reference": "tulip-v2.png",
+  "style": "smooth cartoon, dark warm-brown outlines, warm orange and green palette",
+  "asset_policy": "See assets/README.md Passport v0 materials; illustration assets are excluded from the code MIT license.",
+  "intended_target": {
+    "width": 55,
+    "height": 65,
+    "format": "RGB565A8"
+  },
+  "integration_notes": [
+    "Use a common ground anchor and uniform scale based on the mature plant, rather than fitting each stage independently to the target box.",
+    "RGBA source files preserve generated alpha. Very faint alpha values below 8 extend beyond the visible sprite, as in the bloom reference.",
+    "Visible bounds below use alpha >= 8; coordinates are left, top, right-exclusive, bottom-exclusive.",
+    "The one-pixel canvas-height difference of the bud must be accounted for in mechanical normalization.",
+    "Source generation changed no existing files; runtime integration now creates shared 55x65 canvases at calibrated visible heights 14/28/50 pixels."
+  ],
+  "stages": [
+    {
+      "stage": "seed",
+      "file": "tulip-seed-v1.png",
+      "width": 1100,
+      "height": 1430,
+      "mode": "RGBA",
+      "visible_bounds": [
+        316,
+        1062,
+        782,
+        1303
+      ],
+      "sha256": "f4643d67ab1380957ed630471f1b545b8a79ecfa5e55566d828a9dbac512e932",
+      "prompt_summary": "One tan-brown seed slightly peeking out of the same low brown soil mound; no foliage; reference cartoon style; tall transparent canvas and shared soil scale."
+    },
+    {
+      "stage": "sprout",
+      "file": "tulip-sprout-v1.png",
+      "width": 1100,
+      "height": 1430,
+      "mode": "RGBA",
+      "visible_bounds": [
+        233,
+        750,
+        889,
+        1312
+      ],
+      "sha256": "0838a4748f9a0ffbc66d94e50f12e09f76ff16ea1d47117f7200fd9a18f8db74",
+      "prompt_summary": "One short curved green stem and two small rounded leaves in the same soil mound; no bud or flower; about 40 percent mature height; reference cartoon style and transparent canvas."
+    },
+    {
+      "stage": "bud",
+      "file": "tulip-bud-v1.png",
+      "width": 1100,
+      "height": 1429,
+      "mode": "RGBA",
+      "visible_bounds": [
+        205,
+        258,
+        924,
+        1315
+      ],
+      "sha256": "cd9cc90a23e570ea67b8bc18e9bb3f95efb0ce600298783ee823d343c5fad4bb",
+      "prompt_summary": "One closed narrow orange tulip bud with petal seams on a curved green stem and two leaves; same soil mound; about 75 percent mature height; no open petals; reference cartoon style and transparent canvas."
+    }
+  ],
+  "constraints_common_to_all": "One plant-stage sprite only; no pot, face, text, extra plants, scenery, decoration, floor, cast shadow, or baked checkerboard. Preserve transparency."
+}

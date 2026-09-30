@@ -42,6 +42,8 @@
 
 ## Passport v0 素材
 
+- `images/passport/tulip-seed-v1.png`、`tulip-sprout-v1.png`（1100×1430 RGBA）及 `tulip-bud-v1.png`（1100×1429 RGBA）：2026-09-30 使用内置 ImageGen，参照 `tulip-v2.png` 风格生成。提示词概要和哈希见 `tulip-growth-sources.json`，沿用下述插画授权政策。转换增加三个共用底部锚点的 55×65 RGB565A8 画布，可见高度 14/28/50 px，增加 32,175 bytes 只读 Flash 数据。保留源图 alpha，机械转换以 alpha >= 8 裁切，忽略几乎不可见的边缘噪点。
+
 - `images/passport/world-day-master-v2.png`、`mochun-idle-reference-v3.png`、`tulip-v2.png` 与 `watering-can-v2.png`（PNG 源图；角色及物件含 alpha）：2026-09-29 使用 ImageGen 生成；matsujun / 沫纯以维护者提供的立绘为身份参考。这些插画、缩放后的 target PNG 与图像数组应维护者要求随项目公开，但不适用代码的 MIT 许可。此处不另行授予素材复用或再分发权限，如需使用请联系维护者。历史 `mochun` / `momo` 文件名和图像标识保留以兼容现有引用。
-- `tools/prepare_passport_images.py` 转换为 528×320 RGB565 背景、150×200 RGB565A8 角色、55×65 RGB565A8 郁金香及 60×45 RGB565A8 水壶，写入 `images/passport/passport_images.c` 常量数组并由 main CMake 编译。target PNG 保留缩放结果。图像有效载荷共 446,745 bytes。
+- `tools/prepare_passport_images.py` 转换为 528×320 RGB565 背景、150×200 RGB565A8 角色、55×65 RGB565A8 郁金香及 60×45 RGB565A8 水壶，写入 `images/passport/passport_images.c` 常量数组并由 main CMake 编译。target PNG 保留缩放结果。图像有效载荷共 478,920 bytes。
 - `fonts/passport/NotoSansSC.ttf`：来自 [Google Fonts Noto Sans SC](https://github.com/google/fonts/tree/main/ofl/notosanssc)，SIL Open Font License 1.1，附 `OFL.txt`。完整 TTF 不链接。`tools/prepare_passport_font.ps1` 记录确切文案和 ASCII 0x20–0x7E，使用 lv_font_conv 1.5.3 生成 weight 500 / 18 px / 4 bpp / 不压缩子集。`passport_font_18.c` 由应用编译并显式选用。`tests/passport_render/render.c` 检查实际字形描述符，含缺字负例。

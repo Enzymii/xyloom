@@ -46,3 +46,28 @@ Tests observed correct endpoints and a frame during the doorway movement; this d
 The previous image `e7e41ffa53a6965c82154b7dd162a4c64e74ee53d132a104f5bb88807e81dbe7` received positive device feedback for the tested functions. That feedback does not validate this newer image.
 
 Full v0 drink/watering transactions, growth stages, NVS persistence, night art, sleep pose and autonomous outings remain pending. The tulip is currently a fixed visual preview; growth scheduling is not implemented.
+
+
+## Daily growth and networking validation (2026-10-01)
+
+- Build: NOT RUN — the complete firmware gate is in progress.
+- Host tests: PASS — complete suite, daily cap/excess cups, 14-day minimum, calendar boundaries, bloom recording, migration, clock guards, frozen cross-midnight retries and Wi-Fi form decoding.
+- LVGL rendering and fonts: PASS — 29 snapshots including all plant stages, daily UI, Wi-Fi setup/status/clearing and waiting for time; actual glyph coverage and missing-glyph negative control.
+- Device tests: NOT RUN — this new firmware has not been flashed.
+- Unverified: actual Wi-Fi provisioning/reconnection/clearing, SNTP/date rollover, screen/input behavior, NVS migration/reboot retention and available internal heap during networking.
+
+Networking reference inspected: upstream `demo/blufi-provisioning` at `9c039cc5127f22072afa83bedb7fa3d8efe635ad`. Only stack/lifecycle patterns were consulted; this app uses its own WPA2 hotspot and local Web setup, with Bluetooth disabled.
+
+## Manual watering validation (2026-09-30)
+
+- Build: PASS — complete `tools/validate.sh`, ESP-IDF 5.5.3, exit 0.
+- Host tests: PASS — complete suite, watering timing/input guards, retry/duplicate prevention, record format and actual NVS-worker fault injection.
+- LVGL rendering and fonts: PASS — 18 snapshots, including flight/pouring/return, saving, failure, completion, maximum count and unavailable records; actual Chinese glyph checks plus negative control.
+- Device tests: NOT RUN — watering interaction acceptance awaits user observations; segmented flashing and startup checks passed on COM3.
+- Unverified: physical animation, new text readability, real NVS save/reboot recovery and interrupted-write behavior.
+
+Full image: 1,160,512 bytes, SHA-256 `a9ac0d58f4456be2dd8a606d2ad67f125908d1f838b73a29908b542515602c76`. Matching ELF SHA-256: `ab291f3774db0db4ae6195abe3b0cc7aee7f5e057dbe9a77c1ce258da7907f5b`. Embedded version: `0125d4a-dirty`; SDK `v5.5.3`. Archive: `build/firmware/a9ac0d58f4456be2dd8a606d2ad67f125908d1f838b73a29908b542515602c76/`, independently verified with `tools/archive_firmware.py verify`. Generated firmware and debug files stay outside Git.
+
+With explicit user approval, the verified archive components were flashed on COM3 at `0x0`, `0x8000` and `0x10000`; all three write hashes passed. The NVS region (`0x9000`–`0xEFFF`) was outside the erased/write ranges. A deliberate reset followed by a 15-second startup capture confirmed ESP-IDF 5.5.3, version `0125d4a-dirty`, matching embedded ELF hash prefix `ab291f377`, application/LVGL initialization and no observed panic, watchdog or storage error. The serial port was closed after capture. Raw logs remain local under ignored `work/`.
+
+The existing 8 MB partition layout is unchanged. Segmented flashing preserves the NVS partition. Flashing the merged image at `0x0` may reset saved watering counts. Identify the device and obtain approval before either operation.
