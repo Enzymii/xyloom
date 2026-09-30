@@ -50,11 +50,13 @@ Unverified：新版实体屏颜色、可读性、流畅度、按键时序、真�
 
 ## 每日成长与联网验证（2026-10-01）
 
-- Build：NOT RUN — 完整固件检查正在运行。
+- Build：PASS — 完整 `tools/validate.sh`，ESP-IDF 5.5.3，返回 0；合并镜像和调试归档已独立核验。
 - Host tests：PASS — 完整测试集、每日上限/多余杯数、十四天最短周期、日历边界、开花后记录、迁移、时钟保护、跨午夜冻结快照重试和 Wi-Fi 表单解码。
 - LVGL 渲染与字体：PASS — 29 张画面，包含全部植物阶段、每日界面、Wi-Fi 设置/状态/清除和等待校时；实际字形检查与缺字负例。
 - Device tests：NOT RUN — 此新版固件尚未烧录。
 - Unverified：实际配网/重连/清除凭证、SNTP/跨日、屏幕/按键、NVS 迁移/重启保留，以及联网期间内部内存余量。
+
+合并镜像：1,839,472 bytes，SHA-256 `c2582a4634740dcf8e9484026000e18c65c9a9895142153a423930802612670f`。配套 ELF SHA-256：`2f257dc98151ea5ceb0c42814e58bc239c0e6919761eb4820cf736f204a82e8b`。内嵌版本：`4d29fba-dirty`；SDK `v5.5.3`。归档：`build/firmware/c2582a4634740dcf8e9484026000e18c65c9a9895142153a423930802612670f/`，已使用 `tools/archive_firmware.py verify` 核验。应用源码已提交为 `4d29fba`；构建在提交前启动，保留配置时的版本后缀。生成固件和调试文件不纳入 Git。
 
 已检查联网参考：上游 `demo/blufi-provisioning` 的 `9c039cc5127f22072afa83bedb7fa3d8efe635ad`。仅参考协议栈/生命周期模式，本应用使用独立 WPA2 热点和本地网页配网，不启用蓝牙。
 

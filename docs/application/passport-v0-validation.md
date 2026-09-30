@@ -50,11 +50,13 @@ Full v0 drink/watering transactions, growth stages, NVS persistence, night art, 
 
 ## Daily growth and networking validation (2026-10-01)
 
-- Build: NOT RUN — the complete firmware gate is in progress.
+- Build: PASS — complete `tools/validate.sh`, ESP-IDF 5.5.3, exit 0; merged image and archived debug bundle independently verified.
 - Host tests: PASS — complete suite, daily cap/excess cups, 14-day minimum, calendar boundaries, bloom recording, migration, clock guards, frozen cross-midnight retries and Wi-Fi form decoding.
 - LVGL rendering and fonts: PASS — 29 snapshots including all plant stages, daily UI, Wi-Fi setup/status/clearing and waiting for time; actual glyph coverage and missing-glyph negative control.
 - Device tests: NOT RUN — this new firmware has not been flashed.
 - Unverified: actual Wi-Fi provisioning/reconnection/clearing, SNTP/date rollover, screen/input behavior, NVS migration/reboot retention and available internal heap during networking.
+
+Full image: 1,839,472 bytes, SHA-256 `c2582a4634740dcf8e9484026000e18c65c9a9895142153a423930802612670f`. Matching ELF SHA-256: `2f257dc98151ea5ceb0c42814e58bc239c0e6919761eb4820cf736f204a82e8b`. Embedded version: `4d29fba-dirty`; SDK `v5.5.3`. Archive: `build/firmware/c2582a4634740dcf8e9484026000e18c65c9a9895142153a423930802612670f/`, verified with `tools/archive_firmware.py verify`. Application source is committed as `4d29fba`; the build began before the commit and retains its configured version suffix. Generated firmware and debug files stay outside Git.
 
 Networking reference inspected: upstream `demo/blufi-provisioning` at `9c039cc5127f22072afa83bedb7fa3d8efe635ad`. Only stack/lifecycle patterns were consulted; this app uses its own WPA2 hotspot and local Web setup, with Bluetooth disabled.
 
