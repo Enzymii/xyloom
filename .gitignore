@@ -5,6 +5,21 @@ managed_components/
 .vscode/
 .idea/
 
+# Local tools, build previews, logs, and generation records.
+/work/
+/build-preview/
+/.venv-idf-probe/
+__pycache__/
+*.pyc
+/assets/images/passport/visual-revision-prompts-v2.json
+
+# Superseded artwork and reproducible intermediate font.
+/assets/images/passport/world-day-master-v1.png
+/assets/images/passport/mochun-idle-reference-v2.png
+/assets/images/passport/tulip-v1.png
+/assets/images/passport/watering-can-v1.png
+/assets/fonts/passport/NotoSansSC-Medium.ttf
+
 # Generated repository-local links; canonical skill sources live in skills/.
 /.agents/skills/passport-develop
 /.agents/skills/passport-setup

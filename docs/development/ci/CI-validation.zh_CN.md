@@ -5,7 +5,7 @@
 # PR 自动验证（CI Validation）
 
 两个工作流验证 PR：`.github/workflows/static-checks.yml` 与
-`.github/workflows/firmware-checks.yml`。两者都在 Pull Request、`main` push 和手动触发时运行，
+`.github/workflows/firmware-checks.yml`。两者都在 Pull Request、`main` 或 `master` push 和手动触发时运行，
 与本地共用 `tools/validate.sh`。
 
 ## 工作流

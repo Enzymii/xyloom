@@ -21,10 +21,10 @@
 
 | 文件 | 尺寸与格式 | 用途与来源 |
 | --- | --- | --- |
-| [`images/home.jpg`](images/home.jpg) | 3840 × 2160，JPEG | 嵌入中英文项目 README 的产品主图，突出 AI Passport 产品形象与开放、人人可创作的理念。 |
+| [`images/home.jpg`](images/home.jpg) | 3840 × 2160，JPEG | 嵌入中英文上游文档首页的产品主图，突出 AI Passport 产品形象与开放、人人可创作的理念。 |
 | [`images/readme-hardware-specs.png`](images/readme-hardware-specs.png) | 2172 × 724，PNG RGBA | 保留为可选技术参考图，不再用于首页主视觉。于 2026-09-17 使用内置图像生成工具为本仓库生成；已根据文档中的硬件能力契约核对图中的六项标签与参数。 |
-| [`images/logo-wordmark.png`](images/logo-wordmark.png) | 1648 × 336，PNG RGBA | 从仓库原始 `images/logo.png` 中精确裁切并去除背景的黑色字标；用于中英文项目 README 的浅色主题。 |
-| [`images/logo-wordmark-dark.png`](images/logo-wordmark-dark.png) | 1648 × 336，PNG RGBA | 提取字标的白色版本；README 使用 `<picture>` 在 GitHub 深色主题下显示。 |
+| [`images/logo-wordmark.png`](images/logo-wordmark.png) | 1648 × 336，PNG RGBA | 从仓库原始 `images/logo.png` 中精确裁切并去除背景的黑色字标；用于中英文上游文档首页的浅色主题。 |
+| [`images/logo-wordmark-dark.png`](images/logo-wordmark-dark.png) | 1648 × 336，PNG RGBA | 提取字标的白色版本；上游文档首页使用 `<picture>` 在 GitHub 深色主题下显示。 |
 
 - 使用描述性命名，并记录尺寸、像素格式、转换步骤与目标路径。
 - 优先采用适合 240 × 320 RGB565 显示的格式，并纳入 Flash 与内部 RAM 考量。
@@ -39,3 +39,9 @@
 - 与当前 BSP 音频路径匹配时优先采用 16 kHz、16 位单声道 PCM。
 - 嵌入音频前评估 Flash 与内部 RAM 成本；长录音应流式或分块。
 - 无再分发许可不提交媒体文件。
+
+## Passport v0 素材
+
+- `images/passport/world-day-master-v2.png`、`mochun-idle-reference-v3.png`、`tulip-v2.png` 与 `watering-can-v2.png`（PNG 源图；角色及物件含 alpha）：2026-09-29 使用 ImageGen 生成；matsujun / 沫纯以维护者提供的立绘为身份参考。这些插画、缩放后的 target PNG 与图像数组应维护者要求随项目公开，但不适用代码的 MIT 许可。此处不另行授予素材复用或再分发权限，如需使用请联系维护者。历史 `mochun` / `momo` 文件名和图像标识保留以兼容现有引用。
+- `tools/prepare_passport_images.py` 转换为 528×320 RGB565 背景、150×200 RGB565A8 角色、55×65 RGB565A8 郁金香及 60×45 RGB565A8 水壶，写入 `images/passport/passport_images.c` 常量数组并由 main CMake 编译。target PNG 保留缩放结果。图像有效载荷共 446,745 bytes。
+- `fonts/passport/NotoSansSC.ttf`：来自 [Google Fonts Noto Sans SC](https://github.com/google/fonts/tree/main/ofl/notosanssc)，SIL Open Font License 1.1，附 `OFL.txt`。完整 TTF 不链接。`tools/prepare_passport_font.ps1` 记录确切文案和 ASCII 0x20–0x7E，使用 lv_font_conv 1.5.3 生成 weight 500 / 18 px / 4 bpp / 不压缩子集。`passport_font_18.c` 由应用编译并显式选用。`tests/passport_render/render.c` 检查实际字形描述符，含缺字负例。

@@ -6,7 +6,7 @@
 
 Two workflows validate pull requests: `.github/workflows/static-checks.yml` and
 `.github/workflows/firmware-checks.yml`. Both run for pull requests, pushes to
-`main`, and manual dispatch; local development and CI share `tools/validate.sh`.
+`main` or `master`, and manual dispatch; local development and CI share `tools/validate.sh`.
 
 ## Workflows
 

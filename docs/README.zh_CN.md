@@ -1,5 +1,9 @@
 [English](/docs/README.md) · **简体中文**
 
+本分支的 **Xyloom / 梦隅、Cottage** 品牌说明、当前范围与项目结构，见[项目 README](../README.zh_CN.md)。
+
+本页介绍上游硬件测试基线及其开发资料。本分支启动 Cottage，替代基线的演示菜单。
+
 <h1 align="center">FoloToy AI PASSPORT</h1>
 
 <p align="center">

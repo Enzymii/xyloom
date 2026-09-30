@@ -1,5 +1,9 @@
 **English** · [简体中文](/docs/README.zh_CN.md)
 
+For this fork's **Xyloom / Cottage** branding, current scope, and project structure, see the [project README](../README.md).
+
+This overview describes the upstream hardware-test baseline and its development resources. This fork boots Cottage instead of the baseline demo menu.
+
 <h1 align="center">FoloToy AI PASSPORT</h1>
 
 <p align="center">
