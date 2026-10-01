@@ -18,6 +18,8 @@ static lv_obj_t *s_can, *s_drops[4];
 static lv_obj_t *s_plant, *s_today, *s_growth, *s_growth_fill, *s_daily[4], *s_wifi;
 static lv_obj_t *s_hydration;
 static bool s_daily_filled[4];
+static bool s_rendered;
+static passport_world_t s_previous;
 static passport_dialog_t s_last_dialog = (passport_dialog_t)-1;
 
 static lv_obj_t *shape(lv_obj_t *parent, int x, int y, int width, int height, uint32_t color, int radius) {
@@ -62,6 +64,9 @@ static void draw_daily_drop(lv_event_t *event) {
 }
 
 void passport_view_create(void) {
+    s_rendered = false;
+    s_last_dialog = (passport_dialog_t)-1;
+    memset(s_daily_filled, 0, sizeof(s_daily_filled));
     lv_obj_t *screen = lv_obj_create(NULL);
     lv_obj_remove_style_all(screen);
     lv_obj_set_size(screen, VIEW_WIDTH, VIEW_HEIGHT);
@@ -130,12 +135,36 @@ void passport_view_create(void) {
     lv_screen_load(screen);
 }
 
+/* Only visible state participates: input timestamps and queued commands must
+ * not continuously invalidate a stationary screen and starve the idle task. */
+static bool same_view(const passport_world_t *a, const passport_world_t *b) {
+    return a->scene == b->scene && a->camera_x == b->camera_x &&
+        a->transitioning == b->transitioning && a->momo == b->momo &&
+        a->focus[0] == b->focus[0] && a->focus[1] == b->focus[1] &&
+        a->dialog == b->dialog && a->storage_state == b->storage_state &&
+        a->record.growth == b->record.growth && a->record.today == b->record.today &&
+        a->record.daily == b->record.daily && a->record.day == b->record.day &&
+        a->day == b->day && a->wifi_connected == b->wifi_connected &&
+        a->network_state == b->network_state && a->status_focus == b->status_focus &&
+        !strcmp(a->setup_password, b->setup_password) &&
+        a->battery_percent == b->battery_percent &&
+        (a->dialog != DIALOG_STATUS || a->uptime_minutes == b->uptime_minutes) &&
+        a->watering == b->watering &&
+        (!a->watering || a->watering_elapsed == b->watering_elapsed) &&
+        a->water_save_pending == b->water_save_pending &&
+        a->water_save_inflight == b->water_save_inflight;
+}
+
 void passport_view_render(const passport_world_t *w) {
+    if (s_rendered && same_view(w, &s_previous)) return;
+    s_previous = *w;
+    s_rendered = true;
     static const lv_image_dsc_t *const stages[] = {&passport_tulip_seed, &passport_tulip_sprout, &passport_tulip_bud, &passport_tulip};
     unsigned stage = passport_growth_stage(w->record.growth);
-    lv_image_set_src(s_plant, stages[stage]);
-    lv_obj_set_width(s_growth_fill, 48 * w->record.growth / GROWTH_BLOOM);
-    lv_obj_set_style_bg_opa(s_growth_fill, w->record.growth ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    if (lv_image_get_src(s_plant) != stages[stage]) lv_image_set_src(s_plant, stages[stage]);
+    unsigned percent = passport_growth_stage_percent(w->record.growth);
+    lv_obj_set_width(s_growth_fill, 48 * percent / 100);
+    lv_obj_set_style_bg_opa(s_growth_fill, percent ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     lv_obj_set_style_text_color(s_wifi, lv_color_hex(w->wifi_connected ? 0x5D9565 : 0xA99883), 0);
     lv_obj_set_style_text_opa(s_wifi, w->wifi_connected ? LV_OPA_COVER : LV_OPA_50, 0);
     char today[64];
@@ -240,8 +269,8 @@ void passport_view_render(const passport_world_t *w) {
         static const char *const names[] = {"种子", "幼苗", "花苞", "开花"};
         if (date_ready) snprintf(cup_text, sizeof(cup_text), "%lu 杯", (unsigned long)cups);
         else snprintf(cup_text, sizeof(cup_text), "等待校时");
-        snprintf(text, sizeof(text), "%s\n%s · 成长 %u/56\n今日 %s", w->dialog == DIALOG_TULIP ?
-                 "橙色郁金香" : "浇水完成啦～", names[stage], w->record.growth, cup_text);
+        snprintf(text, sizeof(text), "%s\n%s · %u%%\n今日 %s", w->dialog == DIALOG_TULIP ?
+                 "橙色郁金香" : "浇水完成啦～", names[stage], percent, cup_text);
         lv_obj_set_pos(s_dialog, 16, 208); lv_obj_set_size(s_dialog, 208, 94);
         if (w->dialog == DIALOG_TULIP && w->storage_state != STORAGE_READY)
             snprintf(text, sizeof(text), "橙色郁金香\n%s", w->storage_state == STORAGE_LOADING ?

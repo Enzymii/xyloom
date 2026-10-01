@@ -5,9 +5,11 @@
 #include <stdint.h>
 
 LV_FONT_DECLARE(passport_font_18);
+static unsigned s_flushes;
 static uint16_t s_frame[240 * 320];
 static uint16_t s_partial[240 * 20];
 static void flush(lv_display_t *display, const lv_area_t *area, uint8_t *data) {
+    ++s_flushes;
     uint16_t *pixels = (uint16_t *)data;
     for (int y = area->y1; y <= area->y2; ++y)
         for (int x = area->x1; x <= area->x2; ++x)
@@ -107,7 +109,16 @@ int main(void) {
     const char *paths[] = {"growth-seed.ppm", "growth-sprout.ppm", "growth-bud.ppm", "growth-bloom.ppm"};
     const unsigned progress[] = {0, 4, 20, 56};
     for (unsigned i = 0; i < 4; ++i) { world.record.growth = progress[i]; save(display, paths[i], &world); }
-    world.dialog = DIALOG_TULIP; save(display, "growth-inspect.ppm", &world);
+
+    world.dialog = DIALOG_TULIP;
+    const unsigned midway[] = {2, 12, 38};
+    const char *percent_paths[] = {"percent-seed.ppm", "percent-sprout.ppm", "percent-bud.ppm"};
+    for (unsigned i = 0; i < 3; ++i) {
+        world.record.growth = midway[i];
+        save(display, percent_paths[i], &world);
+    }
+    world.record.growth = 56;
+    save(display, "growth-inspect.ppm", &world);
     world.record.total = world.record.today = UINT32_MAX;
     save(display, "growth-cups-max.ppm", &world);
     world.scene = SCENE_HOUSE; world.camera_x = HOUSE_X; world.dialog = DIALOG_STATUS;
@@ -120,6 +131,30 @@ int main(void) {
     world.day = 20261001; world.record.day = world.day; world.record.total = 56;
     world.record.today = world.record.daily = 3; world.record.growth = 20;
     world.dialog = DIALOG_NONE; save(display, "daily-three.ppm", &world);
-    puts("LVGL render and font coverage: PASS");
+    /* Stationary screen must stop flushing, even as input timestamps change. */
+    unsigned flushed = s_flushes;
+    for (unsigned i = 0; i < 300; ++i) {
+        world.last_activity += 20;
+        world.uptime_minutes++;
+        passport_view_render(&world);
+        lv_tick_inc(20); lv_timer_handler();
+    }
+    assert(s_flushes == flushed);
+    world.record.today++;
+    passport_view_render(&world); lv_refr_now(display);
+    assert(s_flushes > flushed);
+    flushed = s_flushes;
+    world.dialog = DIALOG_STATUS; world.scene = SCENE_HOUSE;
+    passport_view_render(&world); lv_refr_now(display);
+    assert(s_flushes > flushed);
+    flushed = s_flushes;
+    for (unsigned i = 0; i < 100; ++i) {
+        passport_view_render(&world); lv_tick_inc(20); lv_timer_handler();
+    }
+    assert(s_flushes == flushed);
+    world.uptime_minutes++;
+    passport_view_render(&world); lv_refr_now(display);
+    assert(s_flushes > flushed);
+    puts("LVGL render, idle refresh and font coverage: PASS");
     return 0;
 }

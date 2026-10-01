@@ -1,5 +1,6 @@
 #include "network.h"
 #include "network_form.h"
+#include "network_access.h"
 #include "growth.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -44,11 +45,22 @@ static uint32_t local_day(void) {
 }
 
 static bool setup_interface(httpd_req_t *request) {
-    struct sockaddr_in address = {0};
+    struct sockaddr_storage address = {0};
     socklen_t length = sizeof(address);
-    /* The setup server must not accept credential writes from the home LAN. */
-    return getsockname(httpd_req_to_sockfd(request), (struct sockaddr *)&address, &length) == 0 &&
-        address.sin_family == AF_INET && address.sin_addr.s_addr == htonl(0xC0A80401);
+    /* Keep home-LAN requests blocked while allowing the dual-stack listener. */
+    if (getsockname(httpd_req_to_sockfd(request), (struct sockaddr *)&address, &length) != 0)
+        return false;
+    if (address.ss_family == AF_INET && length >= sizeof(struct sockaddr_in)) {
+        const struct sockaddr_in *ipv4 = (const struct sockaddr_in *)&address;
+        return passport_setup_address((const uint8_t *)&ipv4->sin_addr, 4);
+    }
+#if CONFIG_LWIP_IPV6
+    if (address.ss_family == AF_INET6 && length >= sizeof(struct sockaddr_in6)) {
+        const struct sockaddr_in6 *ipv6 = (const struct sockaddr_in6 *)&address;
+        return passport_setup_address((const uint8_t *)&ipv6->sin6_addr, 16);
+    }
+#endif
+    return false;
 }
 static esp_err_t page(httpd_req_t *request) {
     if (!setup_interface(request)) return httpd_resp_send_err(request, HTTPD_403_FORBIDDEN, "Connect to the setup hotspot");

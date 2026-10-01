@@ -15,3 +15,6 @@ bool passport_growth_valid(const passport_growth_t *state);
 bool passport_growth_drink(const passport_growth_t *state, uint32_t day,
                            passport_growth_t *next);
 unsigned passport_growth_stage(uint8_t growth);
+
+/* Whole percent within the current stage; a new stage starts at zero. */
+unsigned passport_growth_stage_percent(uint8_t growth);

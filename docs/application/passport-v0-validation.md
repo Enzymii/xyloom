@@ -48,17 +48,45 @@ The previous image `e7e41ffa53a6965c82154b7dd162a4c64e74ee53d132a104f5bb88807e81
 Full v0 drink/watering transactions, growth stages, NVS persistence, night art, sleep pose and autonomous outings remain pending. The tulip is currently a fixed visual preview; growth scheduling is not implemented.
 
 
+## Current-stage percentage display (2026-10-01)
+
+Plant inspection and watering completion show the current stage’s whole completion percentage instead of cumulative x/56. The garden bar uses the same percentage. Seed 0–4, sprout 4–20 and bud 20–56 each start at zero; bloom stays at 100%. Integer percentages round down. Persistence and growth thresholds are unchanged.
+
+- Build: PASS — complete `tools/validate.sh`, ESP-IDF 5.5.3, exit 0; archive independently verified.
+- Host tests: PASS — complete suite, stage start/midpoint/end boundaries and bloom percentage; 32 rendered snapshots, actual glyph checks and idle-refresh regression.
+- Device tests: NOT RUN — this UI update has not been flashed.
+- Unverified: physical percentage/bar readability and interactions.
+
+Full image: 1,840,176 bytes, SHA-256 `6b575e6c5705f4033be15325d4de4630e40afa4b716d3159ca9789a2be25fd33`. ELF SHA-256: `3b86971ffd041bfd6a1b9437b07d52dfba92c26f5f7e66fa91da3a5f4aabe11c`. Embedded version: `feb6de2-dirty`; SDK `v5.5.3`. Verified archive: `build/firmware/6b575e6c5705f4033be15325d4de4630e40afa4b716d3159ca9789a2be25fd33/`. No physical device was flashed for this update.
+
+Simulator: PARTIAL — the local VOID001 simulator loaded the unchanged verified image and displayed the house; UART ELF prefix `3b86971ff` matched. UP/OK and explicit held/released button levels produced no observed UI change. A sampled PC decoded to the instruction after WFI in `esp_cpu_wait_for_intr`. An ignored local diagnostic copy replacing only that WFI with NOP, with corrected image checksum/SHA and a bud-stage NVS fixture, also failed to restore interaction. The cause remains unresolved; neither percentage inspection nor transitions are claimed as simulator PASS. The production archive and application sources contain no WFI workaround. The browser was restored to the unchanged image. Percentage screenshots come from the actual LVGL host renderer, not simulated firmware. Raw logs, screenshots and test images stay local under ignored `work/`.
+
+## Setup access and idle rendering repair (2026-10-01)
+
+The previous image rejected requests to the setup AP because the HTTP server returned an IPv4-mapped IPv6 socket address, while the guard accepted only IPv4. The guard now uses a full socket address buffer and recognizes both forms of the AP address; other destinations remain rejected. Host cases cover both allowed forms, LAN destinations, native IPv6 and malformed lengths.
+
+Repeated setters invalidated the stationary view every 20 ms. Watchdog samples from the matching previous ELF were in draw dispatch and label drawing. The repair compares visible state before invoking LVGL setters and changes plant image sources only on stage changes. The rendering regression checks that repeated static garden/Status updates produce no additional flushes, while cup and Status-uptime changes still flush.
+
+- Build: PASS — complete `tools/validate.sh`, ESP-IDF 5.5.3, exit 0; archive independently verified.
+- Host tests: PASS — repository suite plus 29 rendered snapshots, glyph checks and stationary-refresh regression.
+- Device tests: PASS — segmented flashing and 45-second startup observation only; no watchdog, panic, assertion or error log observed.
+- Unverified: phone provisioning, normal UI interactions, Wi-Fi/SNTP and day rollover.
+
+With explicit user authorization to repair and flash, the verified archive was written on COM3 at `0x0`, `0x8000` and `0x10000`; all three write hashes passed and the NVS range was excluded. A deliberate reset and 45-second capture confirmed SDK `v5.5.3`, version `feb6de2-dirty` and matching ELF prefix `24fe0a87c`. The previous repeating startup watchdog did not recur within this window. The serial port was closed. Phone setup and physical UI acceptance are deferred to the user; this is not full feature acceptance. Full image: 1,840,112 bytes, SHA-256 `fab28dc27ddd1981d906733ffc058d857c9880bba214bffc08ff01867c30b42e`. ELF SHA-256: `24fe0a87c9905a11fcca116fa1e8352e4cb16fbff1b21b2f19cbdae5ff642094`. Verified archive: `build/firmware/fab28dc27ddd1981d906733ffc058d857c9880bba214bffc08ff01867c30b42e/`. The repair was built from uncommitted sources; its dirty version denotes those changes. Raw logs and generated artifacts remain ignored and local.
+
 ## Daily growth and networking validation (2026-10-01)
 
 - Build: PASS — complete `tools/validate.sh`, ESP-IDF 5.5.3, exit 0; merged image and archived debug bundle independently verified.
 - Host tests: PASS — complete suite, daily cap/excess cups, 14-day minimum, calendar boundaries, bloom recording, migration, clock guards, frozen cross-midnight retries and Wi-Fi form decoding.
 - LVGL rendering and fonts: PASS — 29 snapshots including all plant stages, daily UI, Wi-Fi setup/status/clearing and waiting for time; actual glyph coverage and missing-glyph negative control.
-- Device tests: NOT RUN — this new firmware has not been flashed.
+- Device tests: FAIL — COM3 segmented flashing passed all three write hashes, but a 15-second startup capture observed repeated task-watchdog warnings for IDLE CPU 0 while taskLVGL was running.
 - Unverified: actual Wi-Fi provisioning/reconnection/clearing, SNTP/date rollover, screen/input behavior, NVS migration/reboot retention and available internal heap during networking.
 
 Full image: 1,839,472 bytes, SHA-256 `c2582a4634740dcf8e9484026000e18c65c9a9895142153a423930802612670f`. Matching ELF SHA-256: `2f257dc98151ea5ceb0c42814e58bc239c0e6919761eb4820cf736f204a82e8b`. Embedded version: `4d29fba-dirty`; SDK `v5.5.3`. Archive: `build/firmware/c2582a4634740dcf8e9484026000e18c65c9a9895142153a423930802612670f/`, verified with `tools/archive_firmware.py verify`. Application source is committed as `4d29fba`; the build began before the commit and retains its configured version suffix. Generated firmware and debug files stay outside Git.
 
 Networking reference inspected: upstream `demo/blufi-provisioning` at `9c039cc5127f22072afa83bedb7fa3d8efe635ad`. Only stack/lifecycle patterns were consulted; this app uses its own WPA2 hotspot and local Web setup, with Bluetooth disabled.
+
+With user approval, archive `c2582a4634740dcf8e9484026000e18c65c9a9895142153a423930802612670f` was flashed on COM3 at `0x0`, `0x8000` and `0x10000`, preserving the NVS region. A deliberate reset and bounded startup capture confirmed version `4d29fba-dirty`, SDK `v5.5.3` and ELF prefix `2f257dc98`. Warnings appeared at about 5.5 and 10.5 seconds. Matching-ELF decoding placed sampled PCs in LVGL draw dispatch and label drawing; this establishes rendering activity during idle-task starvation, not the root cause. Application/LVGL initialization completed; runtime acceptance failed. The serial port was closed; raw logs remain local under ignored `work/`. No repair or replacement firmware was flashed.
 
 ## Manual watering validation (2026-09-30)
 

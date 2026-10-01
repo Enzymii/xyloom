@@ -44,3 +44,10 @@ bool passport_growth_drink(const passport_growth_t *s, uint32_t day, passport_gr
 unsigned passport_growth_stage(uint8_t growth) {
     return growth >= 56 ? 3 : growth >= 20 ? 2 : growth >= 4 ? 1 : 0;
 }
+
+unsigned passport_growth_stage_percent(uint8_t growth) {
+    if (growth >= GROWTH_BLOOM) return 100;
+    unsigned start = growth >= 20 ? 20 : growth >= 4 ? 4 : 0;
+    unsigned end = growth >= 20 ? GROWTH_BLOOM : growth >= 4 ? 20 : 4;
+    return (growth - start) * 100 / (end - start);
+}

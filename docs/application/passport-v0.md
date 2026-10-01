@@ -107,7 +107,7 @@ A dedicated application worker initializes the existing BSP battery gauge and po
 
 ## Daily cups, growth and Wi-Fi
 
-Every successful watering records one cup. The first four cups per trusted UTC+8 calendar day advance growth; later cups still count toward today and lifetime totals. Thresholds are 4 for sprout, 20 for bud and 56 for bloom: at least 14 days from a new seed. Growth never decays; bloom remains visible while drinking continues. The garden shows today's cups, four daily slots and a growth bar. Plant inspection shows its stage, growth and today’s cups. No lifetime cups or completed-day totals are displayed. No next plant or collection system is implemented.
+Every successful watering records one cup. The first four cups per trusted UTC+8 calendar day advance growth; later cups still count toward today and lifetime totals. Thresholds are 4 for sprout, 20 for bud and 56 for bloom: at least 14 days from a new seed. Growth never decays; bloom remains visible while drinking continues. The garden shows today's cups, four daily slots and a growth bar. Plant inspection shows its stage, the whole completion percentage within that stage and today’s cups. The bar uses the same stage percentage. Seed spans 0–4, sprout 4–20 and bud 20–56: each newly entered stage starts at 0%, while bloom remains at 100%. Percentages are rounded down; the cumulative x/56 value is not displayed. No lifetime cups or completed-day totals are displayed. No next plant or collection system is implemented.
 
 The worker saves a snapshot frozen when watering starts; an operation crossing midnight belongs to its starting day. Failed saves retry exactly that snapshot without replaying animation or counting twice. The application loop alone updates world state after commit.
 
@@ -120,6 +120,8 @@ Set Wi-Fi opens the WPA2 hotspot `Xyloom-Setup` with a fresh eight-character pas
 The HTTP task scans and receives credentials; a separate network worker owns connection actions and never accesses LVGL. Setup closes five seconds after IP connection or after five minutes. Wrong credentials or unavailable networks can be corrected on the page or by reopening setup. Reconnection tries every ten seconds for five attempts, then every sixty seconds. SNTP uses `ntp.aliyun.com`; the UTC+8 date is trusted only after a plausible synchronization in the current boot. After sync, time continues during an outage while powered; reboot requires a fresh sync. Unknown or backward dates block new watering without resetting quota. Status distinguishes connection from synchronized date. Displayed today/quota roll over at midnight; persistence changes only on a completed cup.
 
 Host tests cover the 14-day minimum, daily cap/excess cups, leap/month/year boundaries, thresholds, bloom recording, unknown/backward clocks, reboot quota, migration, transaction retries and credential form parsing. Device acceptance must cover setup discovery, scan/manual network selection, wrong password, saved reconnection, reconfiguration, credential clearing, SNTP, midnight, readability and internal heap during concurrent networking/UI.
+
+The setup endpoint accepts the AP address in IPv4 and IPv4-mapped IPv6 form, matching ESP-IDF’s dual-stack HTTP listener, and rejects other destination addresses. The view compares visible state before updating LVGL; unchanged scenes do not refresh continuously, while watering, transitions, counters and Status uptime still update when their displayed state changes.
 
 ## Manual watering foundation (superseded record format)
 

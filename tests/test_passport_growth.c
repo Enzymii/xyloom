@@ -1,3 +1,4 @@
+#include "passport/network_access.h"
 #include "passport/growth.h"
 #include "passport/growth_record.h"
 #include "passport/watering_record.h"
@@ -7,6 +8,19 @@
 #include <string.h>
 
 int main(void) {
+    const uint8_t ap4[] = {192,168,4,1};
+    const uint8_t ap6[] = {0,0,0,0,0,0,0,0,0,0,255,255,192,168,4,1};
+    const uint8_t lan4[] = {192,168,1,1};
+    uint8_t bad6[16]; memcpy(bad6, ap6, sizeof(bad6)); bad6[15] = 2;
+    assert(passport_setup_address(ap4, sizeof(ap4)));
+    assert(passport_setup_address(ap6, sizeof(ap6)));
+    assert(!passport_setup_address(lan4, sizeof(lan4)));
+    assert(!passport_setup_address(bad6, sizeof(bad6)));
+    bad6[15] = 1; bad6[0] = 0x20;
+    assert(!passport_setup_address(bad6, sizeof(bad6)));
+    assert(!passport_setup_address(ap6, 15));
+    assert(!passport_setup_address(NULL, 4));
+
     assert(passport_day_valid(20240229) && !passport_day_valid(20260229));
     assert(!passport_day_valid(20260001) && !passport_day_valid(20261301));
     assert(passport_day_next(20240228) == 20240229);
@@ -36,6 +50,19 @@ int main(void) {
     assert(passport_growth_stage(3) == 0 && passport_growth_stage(4) == 1);
     assert(passport_growth_stage(19) == 1 && passport_growth_stage(20) == 2);
     assert(passport_growth_stage(55) == 2 && passport_growth_stage(56) == 3);
+    assert(passport_growth_stage_percent(0) == 0);
+    assert(passport_growth_stage_percent(2) == 50);
+    assert(passport_growth_stage_percent(3) == 75);
+    assert(passport_growth_stage_percent(4) == 0);
+    assert(passport_growth_stage_percent(8) == 25);
+    assert(passport_growth_stage_percent(12) == 50);
+    assert(passport_growth_stage_percent(19) == 93);
+    assert(passport_growth_stage_percent(20) == 0);
+    assert(passport_growth_stage_percent(38) == 50);
+    assert(passport_growth_stage_percent(55) == 97);
+    assert(passport_growth_stage_percent(56) == 100);
+    assert(passport_growth_stage_percent(255) == 100);
+
     s.total = UINT32_MAX; assert(!passport_growth_drink(&s, day, &next));
     uint8_t old[WATERING_RECORD_SIZE]; passport_watering_encode(old, 7);
     assert(passport_growth_decode(old, sizeof(old), &s) && s.total == 7 && !s.growth && !s.day);
