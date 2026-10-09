@@ -6,6 +6,7 @@ typedef struct {
     unsigned state;
     bool connected;
     uint32_t day;
+    uint32_t stamp; /* Trusted UTC seconds; zero before accepted SNTP. */
     char password[9];
 } passport_network_status_t;
 /* Lifetime worker, no LVGL access; call only after NVS initialization succeeds. */

@@ -47,11 +47,13 @@ const lv_image_dsc_t {name} = {{
 if __name__ == "__main__":
     content = '#include "lvgl.h"\n'
     content += descriptor("passport_world_day", "world-day-master-v2.png", (528, 320), False)
+    content += descriptor("passport_world_night", "world-night-master-v1.png", (528, 320), False)
     content += descriptor("passport_momo_idle", "mochun-idle-reference-v3.png", (150, 200), True)
+    content += descriptor("passport_momo_sleep", "matsujun-sleep-v1.png", (150, 200), True, 155)
     content += descriptor("passport_tulip", "tulip-v2.png", (55, 65), True)
     content += descriptor("passport_tulip_seed", "tulip-seed-v1.png", (55, 65), True, 14)
     content += descriptor("passport_tulip_sprout", "tulip-sprout-v1.png", (55, 65), True, 28)
     content += descriptor("passport_tulip_bud", "tulip-bud-v1.png", (55, 65), True, 50)
     content += descriptor("passport_can", "watering-can-v2.png", (60, 45), True)
     (ASSETS / "passport_images.c").write_text(content, encoding="utf-8")
-    print("Image payload: 478920 bytes in const Flash data, no full framebuffer")
+    print("Image payload: 906840 bytes in const Flash data, no full framebuffer")

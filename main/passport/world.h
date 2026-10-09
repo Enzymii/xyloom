@@ -11,7 +11,7 @@ typedef enum { TULIP_SEED, TULIP_SPROUT, TULIP_BUD, TULIP_BLOOM } passport_tulip
 typedef enum { DIALOG_NONE, DIALOG_WELCOME, DIALOG_STATUS, DIALOG_OUT,
                DIALOG_TULIP, DIALOG_CAN, DIALOG_WATER_DONE, DIALOG_WATER_FAILED,
                DIALOG_STORAGE_LOADING, DIALOG_STORAGE_ERROR, DIALOG_WATER_LIMIT,
-               DIALOG_CLOCK_WAIT, DIALOG_FORGET_WIFI } passport_dialog_t;
+               DIALOG_CLOCK_WAIT, DIALOG_FORGET_WIFI, DIALOG_SLEEP } passport_dialog_t;
 typedef enum { STORAGE_LOADING, STORAGE_READY, STORAGE_ERROR } passport_storage_state_t;
 typedef struct { int x, y, rotation; bool pouring; uint32_t pour_elapsed; } passport_water_pose_t;
 typedef struct {
@@ -31,11 +31,14 @@ typedef struct {
     unsigned status_focus, network_state;
     bool wifi_connected, setup_requested, forget_requested;
     char setup_password[9];
-    bool watering, water_save_pending, water_save_inflight;
+    bool watering, water_save_pending, water_save_inflight, save_is_clock;
+    uint32_t clock_tick_at, save_calendar_day;
+    uint64_t clock_pending_ms, save_clock_ms;
 } passport_world_t;
 
 void passport_world_init(passport_world_t *world, uint32_t now);
 void passport_world_handle(passport_world_t *world, passport_input_event_t event, uint32_t now);
+void passport_world_clock_tick(passport_world_t *world, uint32_t now);
 void passport_world_tick(passport_world_t *world, uint32_t now, bool key_down);
 int passport_camera_at(int from, int to, uint32_t elapsed);
 bool passport_world_busy(const passport_world_t *world);

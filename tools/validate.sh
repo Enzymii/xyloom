@@ -5,7 +5,7 @@ mode="${1:---all}"
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() {
-    echo "Usage: $0 [--all|--static|--firmware]" >&2
+    echo "Usage: $0 [--all|--static|--firmware|--simulator]" >&2
 }
 
 run_static_checks() {
@@ -66,13 +66,20 @@ run_static_checks() {
         -o "${test_dir}/test_passport"
     "${test_dir}/test_passport"
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain -Itests/passport_storage_stubs \
-        tests/test_passport_storage.c main/passport/watering_record.c main/passport/growth.c main/passport/growth_record.c \
+        tests/test_passport_storage.c main/passport/watering_record.c main/passport/growth.c main/passport/growth_record.c main/passport/life.c \
         -o "${test_dir}/test_passport_storage"
     "${test_dir}/test_passport_storage"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_passport_life.c main/passport/life.c -o "${test_dir}/test_passport_life"
+    "${test_dir}/test_passport_life"
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
         tests/test_passport_growth.c main/passport/growth.c main/passport/growth_record.c \
         main/passport/watering_record.c main/passport/network_form.c -o "${test_dir}/test_passport_growth"
     "${test_dir}/test_passport_growth"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain -Itests/passport_network_stubs \
+        -DCONFIG_COTTAGE_SIMULATOR_NETWORK=1 tests/test_passport_network.c main/passport/growth.c \
+        -o "${test_dir}/test_passport_network"
+    "${test_dir}/test_passport_network"
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_deep_sleep_contract.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_check_repo.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_verify_firmware.py
@@ -84,6 +91,13 @@ run_static_checks() {
 
 run_firmware_checks() (
     local validation_build_dir
+    local configuration_defaults="${repo_root}/sdkconfig.defaults"
+    local output_name="FoloToy-AI-Passport-full.bin"
+
+    if [[ "${1:-}" == "simulator" ]]; then
+        configuration_defaults+=";${repo_root}/sdkconfig.simulator.defaults"
+        output_name="Cottage-simulator-full.bin"
+    fi
 
     if ! command -v idf.py >/dev/null 2>&1; then
         echo "ERROR: idf.py is not available; activate ESP-IDF 5.5.3 first." >&2
@@ -93,7 +107,7 @@ run_firmware_checks() (
     validation_build_dir="$(mktemp -d /tmp/ai-passport-firmware.XXXXXX)"
     trap 'case "${validation_build_dir}" in /tmp/ai-passport-firmware.*) rm -rf -- "${validation_build_dir}" ;; esac' EXIT
 
-    SDKCONFIG_DEFAULTS="${repo_root}/sdkconfig.defaults" \
+    SDKCONFIG_DEFAULTS="${configuration_defaults}" \
         idf.py -B "${validation_build_dir}" \
         -D "SDKCONFIG=${validation_build_dir}/sdkconfig" build
     idf.py -B "${validation_build_dir}" merge-bin \
@@ -104,7 +118,7 @@ run_firmware_checks() (
     mkdir -p "${repo_root}/build"
     install -m 0644 \
         "${validation_build_dir}/FoloToy-AI-Passport-full.bin" \
-        "${repo_root}/build/FoloToy-AI-Passport-full.bin"
+        "${repo_root}/build/${output_name}"
     echo "Firmware build: PASS"
 )
 
@@ -119,6 +133,10 @@ case "${mode}" in
         ;;
     --firmware)
         run_firmware_checks
+        ;;
+    --simulator)
+        run_static_checks
+        run_firmware_checks simulator
         ;;
     *)
         usage

@@ -160,9 +160,16 @@ Use the unified validation entry point:
 ./tools/validate.sh --static    # repository checks, workflows, links, secrets, host tests
 ./tools/validate.sh --firmware  # build, merge-bin, offsets, and configured layout
 ./tools/validate.sh             # complete gate; requires an activated ESP-IDF environment
+./tools/validate.sh --simulator  # complete gate for Cottage's development-only network profile
 ```
 
 CI calls the same script. Fix the shared script or environment if local and CI behavior differs; do not duplicate command sequences in workflows.
+
+The optional `--simulator` gate adds `sdkconfig.simulator.defaults` after the
+normal defaults and writes `build/Cottage-simulator-full.bin`, preserving the
+normal merged-image path. This RAM-only virtual Wi-Fi profile is for the local
+FoloToy simulator, not physical-device flashing. See the application
+[network profile](../../application/passport-v0.md#simulator-networking).
 
 Hardware-affecting changes must also run the applicable on-device checklist in the hardware guide. Report compilation separately from physical-device validation.
 

@@ -13,6 +13,12 @@ passport_input_event_t passport_input_sample(passport_input_t *s,
         s->candidate_since = now;
         return INPUT_NONE;
     }
+    /* The previous stable release is sufficient, even when the first sample
+     * after an animation is already a new press. Clear before replacing the
+     * candidate; an unreleased or invalid gesture remains suppressed. */
+    if (!blocked && s->candidate == KEY_NONE && s->stable == KEY_NONE &&
+        (uint32_t)(now - s->candidate_since) >= INPUT_DEBOUNCE_MS)
+        s->suppress_until_release = false;
     if (blocked) s->suppress_until_release = true;
     if (raw != s->candidate) {
         s->candidate = raw;
@@ -41,9 +47,6 @@ passport_input_event_t passport_input_sample(passport_input_t *s,
             return INPUT_WAKE;
         }
     }
-    /* Clear a transition guard even if no key was held during the transition. */
-    if (!blocked && raw == KEY_NONE && s->stable == KEY_NONE &&
-        (uint32_t)(now - s->candidate_since) >= INPUT_DEBOUNCE_MS) s->suppress_until_release = false;
     if (raw == s->stable && s->stable != KEY_NONE && !s->consumed && !s->suppress_until_release &&
         (uint32_t)(now - s->pressed_at) >= INPUT_LONG_MS) {
         s->consumed = true;

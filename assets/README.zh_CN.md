@@ -47,3 +47,7 @@
 - `images/passport/world-day-master-v2.png`、`mochun-idle-reference-v3.png`、`tulip-v2.png` 与 `watering-can-v2.png`（PNG 源图；角色及物件含 alpha）：2026-09-29 使用 ImageGen 生成；matsujun / 沫纯以维护者提供的立绘为身份参考。这些插画、缩放后的 target PNG 与图像数组应维护者要求随项目公开，但不适用代码的 MIT 许可。此处不另行授予素材复用或再分发权限，如需使用请联系维护者。历史 `mochun` / `momo` 文件名和图像标识保留以兼容现有引用。
 - `tools/prepare_passport_images.py` 转换为 528×320 RGB565 背景、150×200 RGB565A8 角色、55×65 RGB565A8 郁金香及 60×45 RGB565A8 水壶，写入 `images/passport/passport_images.c` 常量数组并由 main CMake 编译。target PNG 保留缩放结果。图像有效载荷共 478,920 bytes。
 - `fonts/passport/NotoSansSC.ttf`：来自 [Google Fonts Noto Sans SC](https://github.com/google/fonts/tree/main/ofl/notosanssc)，SIL Open Font License 1.1，附 `OFL.txt`。完整 TTF 不链接。`tools/prepare_passport_font.ps1` 记录确切文案和 ASCII 0x20–0x7E，使用 lv_font_conv 1.5.3 生成 weight 500 / 18 px / 4 bpp / 不压缩子集。`passport_font_18.c` 由应用编译并显式选用。`tests/passport_render/render.c` 检查实际字形描述符，含缺字负例。
+
+### Cottage 生活素材（2026-10-09）
+
+`images/passport/world-night-master-v1.png` 和 `matsujun-sleep-v1.png` 由内置 ImageGen 生成，分别以现有白天全景和待机角色为编辑参考，沿用现有插画授权政策。夜景提示词保留连续花园／小屋构图，改为月光室外与暖灯室内；睡姿提示词保留角色身份和服装，要求闭眼坐睡及真实透明背景。`tools/prepare_passport_images.py` 将它们转换为 `passport_world_night`（528×320 RGB565）和 `passport_momo_sleep`（150×200 RGB565A8，可见高度 155 px、底部对齐）。全部常量图片数据现在共 906,840 字节。保留原白天／待机源图，目标 PNG 和生成数组沿用既有显示格式。

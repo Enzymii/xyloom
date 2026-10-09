@@ -24,14 +24,39 @@ uint32_t passport_day_next(uint32_t day) {
 bool passport_growth_valid(const passport_growth_t *s) {
     return s->growth <= GROWTH_BLOOM && s->growth <= s->total && s->daily <= GROWTH_DAILY_MAX &&
         s->today <= s->total && s->daily <= s->today && s->daily <= s->growth &&
-        (s->day ? passport_day_valid(s->day) : (s->today == 0 && s->daily == 0));
+        (!s->day || passport_day_valid(s->day)) && s->clock_mode <= CLOCK_BRIDGED &&
+        (s->clock_mode == CLOCK_LOCAL ? s->phase_seconds < CLOCK_PERIOD_SECONDS :
+         (passport_day_valid(s->day) && s->phase_seconds == 0));
+}
+
+bool passport_growth_clock(const passport_growth_t *s, uint32_t day,
+                           uint64_t elapsed, passport_growth_t *next) {
+    if (!passport_growth_valid(s) || elapsed > UINT64_MAX - s->runtime_seconds) return false;
+    passport_growth_t value = *s;
+    value.runtime_seconds += elapsed;
+    bool trusted = passport_day_valid(day) && day >= s->day;
+    if (s->clock_mode == CLOCK_LOCAL || !trusted) {
+        uint64_t cycles = elapsed / CLOCK_PERIOD_SECONDS;
+        uint32_t phase = (uint32_t)(elapsed % CLOCK_PERIOD_SECONDS) + s->phase_seconds;
+        if (cycles || phase >= CLOCK_PERIOD_SECONDS) { value.today = 0; value.daily = 0; }
+        value.phase_seconds = phase % CLOCK_PERIOD_SECONDS;
+        value.clock_mode = CLOCK_LOCAL;
+        if (trusted) {
+            /* Bind this uncertain bucket without granting a second allowance or
+             * presenting its cups as having a known calendar date. */
+            value.day = day; value.phase_seconds = 0; value.clock_mode = CLOCK_BRIDGED;
+        }
+    } else if (day != s->day) {
+        value.day = day; value.today = 0; value.daily = 0;
+        value.phase_seconds = 0; value.clock_mode = CLOCK_CALENDAR;
+    }
+    *next = value;
+    return true;
 }
 
 bool passport_growth_drink(const passport_growth_t *s, uint32_t day, passport_growth_t *next) {
-    if (!passport_growth_valid(s) || !passport_day_valid(day) || day < s->day ||
-        s->total == UINT32_MAX) return false;
-    passport_growth_t value = *s;
-    if (day != s->day) { value.day = day; value.today = 0; value.daily = 0; }
+    passport_growth_t value;
+    if (s->total == UINT32_MAX || !passport_growth_clock(s, day, 0, &value)) return false;
     ++value.total; ++value.today;
     if (value.daily < GROWTH_DAILY_MAX) {
         ++value.daily;

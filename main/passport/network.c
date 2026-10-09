@@ -2,6 +2,7 @@
 #include "network_form.h"
 #include "network_access.h"
 #include "growth.h"
+#include "sdkconfig.h"
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
@@ -28,12 +29,19 @@ enum { COMMAND_SETUP = 1, COMMAND_FORGET = 2 };
 
 static void event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     (void)arg; (void)data;
-    if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) atomic_store(&s_connected, true);
-    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) atomic_store(&s_connected, false);
+    if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        atomic_store(&s_connected, true);
+        ESP_LOGI(TAG, "Wi-Fi obtained an IP address");
+    }
+    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        atomic_store(&s_connected, false);
+        ESP_LOGI(TAG, "Wi-Fi disconnected");
+    }
 }
 static void synced(struct timeval *tv) {
     /* Ignore implausible network dates; never trust RTC state inherited from reset. */
     atomic_store(&s_synced, tv->tv_sec >= 1577836800LL && tv->tv_sec < 4102444800LL);
+    if (atomic_load(&s_synced)) ESP_LOGI(TAG, "Network time synchronized");
 }
 static uint32_t local_day(void) {
     if (!atomic_load(&s_synced)) return 0;
@@ -44,6 +52,7 @@ static uint32_t local_day(void) {
     return passport_day_valid(day) ? day : 0;
 }
 
+#if !CONFIG_COTTAGE_SIMULATOR_NETWORK
 static bool setup_interface(httpd_req_t *request) {
     struct sockaddr_storage address = {0};
     socklen_t length = sizeof(address);
@@ -121,10 +130,12 @@ static esp_err_t connect_form(httpd_req_t *request) {
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     return httpd_resp_sendstr(request, "<meta charset=utf-8><p>正在连接。请查看 Passport 上的 Wi-Fi 与日期状态；连接成功后热点会关闭。失败时返回此页重试。</p><a href=/>返回</a>");
 }
+#endif
 static void stop_setup(void) {
     if (s_http) { httpd_stop(s_http); s_http = NULL; }
     esp_wifi_set_mode(WIFI_MODE_STA);
 }
+#if !CONFIG_COTTAGE_SIMULATOR_NETWORK
 static esp_err_t start_setup(char password[9]) {
     static const char alphabet[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     for (unsigned i = 0; i < 8; ++i) password[i] = alphabet[esp_random() % (sizeof(alphabet) - 1)];
@@ -150,6 +161,15 @@ static esp_err_t start_setup(char password[9]) {
     if (err == ESP_OK) err = httpd_register_uri_handler(s_http, &post);
     return err;
 }
+#endif
+
+#if CONFIG_COTTAGE_SIMULATOR_NETWORK
+static void simulator_config(wifi_config_t *config) {
+    memset(config, 0, sizeof(*config));
+    memcpy(config->sta.ssid, "Emulator Host Bridge", sizeof("Emulator Host Bridge"));
+    config->sta.threshold.authmode = WIFI_AUTH_OPEN;
+}
+#endif
 
 static void worker(void *arg) {
     (void)arg;
@@ -175,19 +195,34 @@ static void worker(void *arg) {
     if (err == ESP_OK) err = esp_wifi_set_default_wifi_ap_handlers();
     if (err != ESP_OK) goto failed;
     wifi_init_config_t wifi = WIFI_INIT_CONFIG_DEFAULT();
+#if CONFIG_COTTAGE_SIMULATOR_NETWORK
+    wifi.nvs_enable = false;
+#endif
     err = esp_wifi_init(&wifi);
     if (err != ESP_OK) goto failed;
     wifi_ready = true;
     err = esp_event_handler_instance_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, event, NULL, &wifi_handler);
     if (err == ESP_OK) err = esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, event, NULL, &ip_handler);
+    /* Simulator credentials must never replace physical-device credentials. */
+#if CONFIG_COTTAGE_SIMULATOR_NETWORK
+    if (err == ESP_OK) err = esp_wifi_set_storage(WIFI_STORAGE_RAM);
+#else
     if (err == ESP_OK) err = esp_wifi_set_storage(WIFI_STORAGE_FLASH);
+#endif
     if (err == ESP_OK) err = esp_wifi_set_mode(WIFI_MODE_STA);
     if (err == ESP_OK) err = esp_wifi_start();
     if (err != ESP_OK) goto failed;
+#if CONFIG_COTTAGE_SIMULATOR_NETWORK
+    simulator_config(&pending_config);
+    config_pending = true;
+    config_until = esp_timer_get_time() / 1000 + 5000;
+    ESP_LOGI(TAG, "Simulator network enabled (RAM only)");
+#else
     wifi_config_t saved = {0};
     err = esp_wifi_get_config(WIFI_IF_STA, &saved);
     credentials_saved = err == ESP_OK && saved.sta.ssid[0];
     memset(&saved, 0, sizeof(saved));
+#endif
     esp_sntp_config_t ntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("ntp.aliyun.com");
     ntp.sync_cb = synced; ntp.start = false;
     err = esp_netif_sntp_init(&ntp);
@@ -203,16 +238,28 @@ static void worker(void *arg) {
             while (xQueueReceive(s_credentials, &discarded, 0) == pdTRUE) memset(&discarded, 0, sizeof(discarded));
             esp_wifi_disconnect(); atomic_store(&s_connected, false);
             /* Clear only Wi-Fi configuration, never application watering records. */
+#if CONFIG_COTTAGE_SIMULATOR_NETWORK
+            /* Disconnect + disable retries; the only RAM config is public. */
+            err = ESP_OK;
+#else
             err = esp_wifi_restore();
+#endif
             if (err == ESP_OK) err = esp_wifi_set_mode(WIFI_MODE_STA);
             if (err == ESP_OK) { credentials_saved = false; status.state = NETWORK_OFFLINE; }
             else status.state = NETWORK_ERROR;
             memset(status.password, 0, sizeof(status.password));
         } else if ((commands & COMMAND_SETUP) && !setup) {
+#if CONFIG_COTTAGE_SIMULATOR_NETWORK
+            esp_wifi_disconnect(); atomic_store(&s_connected, false);
+            simulator_config(&pending_config);
+            config_pending = true; config_at = now + 250; config_until = now + 5000;
+            status.state = NETWORK_CONNECTING;
+#else
             err = start_setup(status.password);
             setup = err == ESP_OK;
             if (!setup) { stop_setup(); status.state = NETWORK_ERROR; }
             else { setup_until = now + 300000; status.state = NETWORK_SETUP; }
+#endif
             retries = 0; connected_at = 0;
         }
         passport_wifi_credentials_t credentials;
@@ -256,6 +303,7 @@ static void worker(void *arg) {
             status.state = connected ? NETWORK_CONNECTED : NETWORK_OFFLINE;
         }
         status.connected = connected; status.day = local_day();
+        status.stamp = status.day ? (uint32_t)time(NULL) : 0;
         xQueueOverwrite(s_status, &status);
         vTaskDelay(pdMS_TO_TICKS(250));
     }

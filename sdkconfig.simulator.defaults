@@ -1,0 +1,5 @@
+# Apply after sdkconfig.defaults; never use this profile for physical devices.
+CONFIG_COTTAGE_SIMULATOR_NETWORK=y
+# The browser runtime captures UART0, not the native USB-Serial-JTAG console.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=n
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y

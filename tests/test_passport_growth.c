@@ -7,7 +7,58 @@
 #include <stdio.h>
 #include <string.h>
 
+static void offline_tests(void) {
+    passport_growth_t s = {0}, next, reboot;
+    uint8_t bytes[GROWTH_RECORD_SIZE];
+    for (unsigned i = 0; i < 7; ++i) {
+        assert(passport_growth_drink(&s, 0, &s));
+        assert(s.today == i + 1 && s.daily == (i < 4 ? i + 1 : 4));
+        assert(s.growth == s.daily && !s.day && s.clock_mode == CLOCK_LOCAL);
+    }
+    assert(passport_growth_clock(&s, 0, 86399, &s));
+    passport_growth_encode(bytes, &s);
+    assert(passport_growth_decode(bytes, sizeof(bytes), &reboot));
+    assert(reboot.phase_seconds == 86399 && reboot.daily == 4 && reboot.total == 7);
+    assert(passport_growth_drink(&reboot, 0, &next) && next.growth == 4 && next.today == 8);
+    assert(passport_growth_clock(&next, 0, 1, &s));
+    assert(!s.today && !s.daily && s.growth == 4 && s.runtime_seconds == 86400);
+    assert(passport_growth_drink(&s, 0, &s) && s.growth == 5 && s.total == 9);
+    assert(passport_growth_clock(&s, 0, 86400 * 3 + 17, &s));
+    assert(!s.daily && !s.today && s.phase_seconds == 17 && s.growth == 5);
+    for (unsigned i = 0; i < 5; ++i) assert(passport_growth_drink(&s, 0, &s));
+    assert(s.daily == 4 && s.growth == 9); /* Missed cycles do not bank allowances. */
+    assert(passport_growth_clock(&s, 20261008, 0, &s));
+    assert(s.clock_mode == CLOCK_BRIDGED && s.daily == 4 && s.today == 5);
+    assert(passport_growth_drink(&s, 20261008, &s) && s.growth == 9 && s.today == 6);
+    assert(passport_growth_clock(&s, 20261009, 0, &s));
+    assert(s.clock_mode == CLOCK_CALENDAR && !s.daily && !s.today);
+    assert(passport_growth_drink(&s, 20261009, &s) && s.growth == 10);
+    assert(passport_growth_clock(&s, 20261008, 60, &s));
+    assert(s.clock_mode == CLOCK_LOCAL && s.day == 20261009 && s.phase_seconds == 60);
+    assert(passport_growth_drink(&s, 20261008, &s) && s.daily == 2);
+    assert(passport_growth_clock(&s, 20261009, 1, &s));
+    assert(s.clock_mode == CLOCK_BRIDGED && s.daily == 2 && s.growth == 11);
+    assert(passport_growth_clock(&s, 0, 10, &s));
+    assert(s.clock_mode == CLOCK_LOCAL && s.daily == 2 && s.phase_seconds == 10);
+    assert(passport_growth_clock(&s, 20261012, 0, &s));
+    assert(s.daily == 2 && s.clock_mode == CLOCK_BRIDGED); /* Cold boot cannot date the offline cups. */
+    s.runtime_seconds = UINT64_MAX;
+    assert(!passport_growth_clock(&s, 0, 1, &next));
+    s = (passport_growth_t){.phase_seconds = 86400};
+    assert(!passport_growth_valid(&s));
+    s = (passport_growth_t){.total = 4, .today = 4, .day = 20261008, .growth = 4,
+        .daily = 4, .clock_mode = CLOCK_CALENDAR};
+    passport_growth_encode(bytes, &s);
+    bytes[4] = 2; bytes[7] = 0; /* The prior 24-byte version retains its plant/quota. */
+    assert(passport_growth_decode(bytes, 24, &reboot));
+    assert(reboot.growth == 4 && reboot.daily == 4 && reboot.clock_mode == CLOCK_CALENDAR);
+    assert(passport_growth_drink(&reboot, 0, &next) && next.growth == 4 && next.today == 5);
+    for (size_t i = 0; i < 12; ++i) assert(!passport_growth_decode(bytes, i, &reboot));
+    bytes[4] = 4; assert(!passport_growth_decode(bytes, sizeof(bytes), &reboot));
+}
+
 int main(void) {
+    offline_tests();
     const uint8_t ap4[] = {192,168,4,1};
     const uint8_t ap6[] = {0,0,0,0,0,0,0,0,0,0,255,255,192,168,4,1};
     const uint8_t lan4[] = {192,168,1,1};
@@ -28,7 +79,7 @@ int main(void) {
     assert(passport_day_next(20261231) == 20270101);
     assert(passport_day_next(20991231) == 0);
     passport_growth_t s = {0}, next, decoded;
-    assert(!passport_growth_drink(&s, 0, &next));
+    assert(passport_growth_drink(&s, 0, &next) && next.total == 1 && next.growth == 1);
     uint32_t day = 20261001;
     for (unsigned d = 0; d < 14; ++d) {
         for (unsigned i = 0; i < 7; ++i) {
@@ -44,7 +95,7 @@ int main(void) {
         day = passport_day_next(day);
     }
     assert(s.growth == 56 && s.total == 98 && passport_growth_stage(s.growth) == 3);
-    assert(!passport_growth_drink(&s, 20261001, &next)); /* Clock rollback. */
+    assert(passport_growth_drink(&s, 20261001, &next) && next.clock_mode == CLOCK_LOCAL && next.daily == 4 && next.growth == 56); /* Rollback retains the allowance. */
     assert(passport_growth_drink(&s, day, &next)); s = next;
     assert(s.today == 1 && s.daily == 1 && s.growth == 56 && s.total == 99);
     assert(passport_growth_stage(3) == 0 && passport_growth_stage(4) == 1);
@@ -68,7 +119,7 @@ int main(void) {
     assert(passport_growth_decode(old, sizeof(old), &s) && s.total == 7 && !s.growth && !s.day);
     uint8_t bytes[GROWTH_RECORD_SIZE]; passport_growth_encode(bytes, &s);
     bytes[5] = 57; assert(!passport_growth_decode(bytes, sizeof(bytes), &decoded));
-    passport_growth_encode(bytes, &s); bytes[20] = 1;
+    passport_growth_encode(bytes, &s); bytes[32] = 1;
     assert(!passport_growth_decode(bytes, sizeof(bytes), &decoded));
     assert(!passport_growth_decode(bytes, 23, &decoded));
     passport_wifi_credentials_t credentials;

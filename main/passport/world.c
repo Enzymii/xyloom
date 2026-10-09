@@ -8,6 +8,7 @@ void passport_world_init(passport_world_t *w, uint32_t now) {
     w->battery_percent = -1;
     w->camera_x = HOUSE_X;
     w->last_activity = now;
+    w->clock_tick_at = now;
 }
 
 int passport_camera_at(int from, int to, uint32_t elapsed) {
@@ -55,12 +56,41 @@ bool passport_world_take_water_save(passport_world_t *w, passport_growth_t *reco
 void passport_world_water_saved(passport_world_t *w, bool success, uint32_t now) {
     if (!w->water_save_inflight) return;
     w->water_save_inflight = false;
-    w->last_activity = now;
+    if (!w->save_is_clock) w->last_activity = now;
     if (success) {
         w->record = w->water_target;
+        w->clock_pending_ms -= w->save_clock_ms;
         w->tulip = (passport_tulip_t)passport_growth_stage(w->record.growth);
-        w->dialog = DIALOG_WATER_DONE;
+        if (!w->save_is_clock) w->dialog = DIALOG_WATER_DONE;
+        else if (w->dialog == DIALOG_WATER_FAILED) w->dialog = DIALOG_NONE;
+        w->save_is_clock = false;
     } else w->dialog = DIALOG_WATER_FAILED;
+}
+
+
+static bool prepare_clock(passport_world_t *w, passport_growth_t *target) {
+    return passport_growth_clock(&w->record, w->day, w->clock_pending_ms / 1000, target);
+}
+static void freeze_clock(passport_world_t *w, bool clock_only) {
+    w->save_is_clock = clock_only;
+    w->save_calendar_day = w->day;
+    w->save_clock_ms = w->clock_pending_ms / 1000 * 1000;
+}
+void passport_world_clock_tick(passport_world_t *w, uint32_t now) {
+    uint32_t elapsed = now - w->clock_tick_at;
+    w->clock_tick_at = now;
+    if (w->storage_state != STORAGE_READY) return;
+    w->clock_pending_ms += elapsed;
+    if (passport_world_busy(w) || w->dialog == DIALOG_WATER_FAILED ||
+        (uint32_t)(now - w->last_activity) < 200) return;
+    passport_growth_t target;
+    if (!prepare_clock(w, &target)) return;
+    bool boundary = target.clock_mode != w->record.clock_mode || target.day != w->record.day ||
+                    target.today != w->record.today || target.daily != w->record.daily;
+    if (w->clock_pending_ms < 60000 && !boundary) return;
+    w->water_target = target;
+    freeze_clock(w, true);
+    w->water_save_pending = true;
 }
 
 void passport_world_handle(passport_world_t *w, passport_input_event_t event, uint32_t now) {
@@ -71,10 +101,12 @@ void passport_world_handle(passport_world_t *w, passport_input_event_t event, ui
         return;
     }
     if (event == INPUT_WAKE || passport_world_busy(w)) return;
-    if (w->dialog == DIALOG_WATER_FAILED && event == OK_SHORT) {
-        w->dialog = DIALOG_NONE;
-        w->water_save_pending = true;
-        return;
+    if (w->dialog == DIALOG_WATER_FAILED) {
+        if (event == OK_SHORT) {
+            w->dialog = DIALOG_NONE;
+            w->water_save_pending = true;
+        }
+        return; /* Preserve the frozen transaction until it is acknowledged. */
     }
     if (w->dialog == DIALOG_FORGET_WIFI) {
         if (event == OK_SHORT) { w->forget_requested = true; w->dialog = DIALOG_STATUS; }
@@ -106,15 +138,17 @@ void passport_world_handle(passport_world_t *w, passport_input_event_t event, ui
     } else if (event == OK_SHORT) {
         if (w->scene == SCENE_HOUSE) {
             w->dialog = w->focus[SCENE_HOUSE] ? DIALOG_STATUS :
-                w->momo == OUT ? DIALOG_OUT : DIALOG_WELCOME;
+                w->momo == OUT ? DIALOG_OUT : w->momo == HOME_SLEEP ? DIALOG_SLEEP : DIALOG_WELCOME;
             w->status_focus = 0;
         } else {
             if (!w->focus[SCENE_GARDEN]) w->dialog = DIALOG_TULIP;
             else if (w->storage_state == STORAGE_LOADING) w->dialog = DIALOG_STORAGE_LOADING;
             else if (w->storage_state == STORAGE_ERROR) w->dialog = DIALOG_STORAGE_ERROR;
             else if (w->record.total == UINT32_MAX) w->dialog = DIALOG_WATER_LIMIT;
-            else if (!passport_growth_drink(&w->record, w->day, &w->water_target)) w->dialog = DIALOG_CLOCK_WAIT;
+            else if (!prepare_clock(w, &w->water_target) ||
+                     !passport_growth_drink(&w->water_target, w->day, &w->water_target)) w->dialog = DIALOG_STORAGE_ERROR;
             else {
+                freeze_clock(w, false);
                 w->watering = true;
                 w->watering_started = now;
                 w->watering_elapsed = 0;
@@ -134,7 +168,7 @@ void passport_world_tick(passport_world_t *w, uint32_t now, bool key_down) {
             w->water_save_pending = true;
         }
         w->last_activity = now;
-    } else if (w->water_save_pending || w->water_save_inflight) {
+    } else if ((w->water_save_pending || w->water_save_inflight) && !w->save_is_clock) {
         w->last_activity = now;
     } else if (w->transitioning) {
         uint32_t elapsed = now - w->transition_started;
@@ -146,6 +180,6 @@ void passport_world_tick(passport_world_t *w, uint32_t now, bool key_down) {
         }
     } else if (!w->sleeping && (uint32_t)(now - w->last_activity) >= STANDBY_MS) {
         w->sleeping = true;
-        w->dialog = DIALOG_NONE;
+        if (w->dialog != DIALOG_WATER_FAILED) w->dialog = DIALOG_NONE;
     }
 }

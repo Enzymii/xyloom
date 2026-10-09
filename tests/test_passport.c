@@ -60,6 +60,41 @@ static void input_tests(void) {
     assert(sample(&s, KEY_LEFT, 629) == LEFT_LONG); /* clock wrap */
 }
 
+
+/* Releasing during an animation must not swallow the first fresh gesture
+ * after it ends, even if there is no idle sample between the two. */
+static void transition_release_tests(void) {
+    passport_input_t s;
+    passport_input_init(&s);
+    passport_input_sample(&s, KEY_OK, 0, false, true);
+    passport_input_sample(&s, KEY_OK, 30, false, true);
+    passport_input_sample(&s, KEY_NONE, 100, false, true);
+    passport_input_sample(&s, KEY_NONE, 130, false, true);
+    assert(passport_input_sample(&s, KEY_LEFT, 200, false, false) == INPUT_NONE);
+    assert(passport_input_sample(&s, KEY_LEFT, 230, false, false) == INPUT_NONE);
+    assert(passport_input_sample(&s, KEY_LEFT, 930, false, false) == LEFT_LONG);
+    assert(passport_input_sample(&s, KEY_NONE, 940, false, false) == INPUT_NONE);
+    assert(passport_input_sample(&s, KEY_NONE, 970, false, false) == INPUT_NONE);
+    const passport_key_t keys[] = {KEY_LEFT, KEY_RIGHT, KEY_OK};
+    const passport_input_event_t taps[] = {LEFT_SHORT, RIGHT_SHORT, OK_SHORT};
+    for (unsigned i = 0; i < 3; ++i) {
+        passport_input_init(&s);
+        passport_input_sample(&s, KEY_NONE, 0, false, true);
+        passport_input_sample(&s, KEY_NONE, 100, false, true);
+        passport_input_sample(&s, keys[i], 200, false, false);
+        passport_input_sample(&s, keys[i], 230, false, false);
+        passport_input_sample(&s, KEY_NONE, 300, false, false);
+        assert(passport_input_sample(&s, KEY_NONE, 330, false, false) == taps[i]);
+    }
+    /* A release shorter than debounce does not re-arm an interrupted hold. */
+    passport_input_init(&s);
+    passport_input_sample(&s, KEY_RIGHT, 0, false, true);
+    passport_input_sample(&s, KEY_RIGHT, 30, false, true);
+    passport_input_sample(&s, KEY_NONE, 100, false, true);
+    assert(passport_input_sample(&s, KEY_RIGHT, 120, false, false) == INPUT_NONE);
+    assert(passport_input_sample(&s, KEY_RIGHT, 1000, false, false) == INPUT_NONE);
+}
+
 static void restore(passport_world_t *w, bool ok, uint32_t total) {
     passport_growth_t record = {.total = total};
     passport_world_storage_loaded(w, ok, &record);
@@ -190,19 +225,18 @@ static void watering_tests(void) {
     passport_world_init(&w, 0); restore(&w, true, 0);
     w.scene = SCENE_GARDEN; w.focus[SCENE_GARDEN] = 1; w.day = 0;
     passport_world_handle(&w, OK_SHORT, 1);
-    assert(w.dialog == DIALOG_CLOCK_WAIT && !w.watering && w.record.total == 0);
-    passport_world_handle(&w, OK_SHORT, 2); w.day = 20261001;
-    passport_world_handle(&w, OK_SHORT, 3); w.day = 20261002;
-    passport_world_tick(&w, 3 + WATERING_MS, false);
-    assert(passport_world_take_water_save(&w, &count) && count.day == 20261001);
+    assert(w.watering && w.record.total == 0 && w.water_target.clock_mode == CLOCK_LOCAL);
+    w.day = 20261002; /* Sync during a transaction must not change its frozen bucket. */
+    passport_world_tick(&w, 1 + WATERING_MS, false);
+    assert(passport_world_take_water_save(&w, &count) && count.day == 0);
     passport_world_water_saved(&w, false, 2000);
     passport_world_handle(&w, OK_SHORT, 2001);
-    assert(passport_world_take_water_save(&w, &count) && count.day == 20261001 && count.growth == 1);
+    assert(passport_world_take_water_save(&w, &count) && count.day == 0 && count.growth == 1);
     passport_world_water_saved(&w, true, 2002);
-    assert(w.record.total == 1 && w.record.day == 20261001);
+    assert(w.record.total == 1 && w.record.day == 0);
     passport_world_handle(&w, OK_SHORT, 2003);
     passport_world_handle(&w, OK_SHORT, 2004);
-    assert(w.water_target.day == 20261002 && w.water_target.today == 1 && w.water_target.growth == 2);
+    assert(w.water_target.day == 20261002 && w.water_target.today == 2 && w.water_target.growth == 2 && w.water_target.clock_mode == CLOCK_BRIDGED);
 
     passport_world_init(&w, 0); w.dialog = DIALOG_STATUS;
     passport_world_handle(&w, RIGHT_SHORT, 1); passport_world_handle(&w, OK_SHORT, 2);
@@ -213,6 +247,140 @@ static void watering_tests(void) {
     assert(w.dialog == DIALOG_STATUS && !w.forget_requested);
     passport_world_handle(&w, OK_SHORT, 6); passport_world_handle(&w, OK_SHORT, 7);
     assert(w.forget_requested && w.dialog == DIALOG_STATUS);
+}
+
+
+typedef struct {
+    passport_input_t input;
+    passport_world_t world;
+    uint32_t now;
+} journey_t;
+
+/* Use the application's 10 ms sampling order rather than injecting semantic
+ * button events; persistence acknowledgements stay explicit below. */
+static void journey_frames(journey_t *j, passport_key_t key, unsigned duration) {
+    for (unsigned elapsed = 0; elapsed < duration; elapsed += 10) {
+        j->now += 10;
+        passport_world_clock_tick(&j->world, j->now);
+        if (j->world.save_is_clock && j->world.water_save_pending) {
+            passport_growth_t clock;
+            assert(passport_world_take_water_save(&j->world, &clock));
+            passport_world_water_saved(&j->world, true, j->now);
+        }
+        passport_input_event_t event = passport_input_sample(&j->input, key, j->now,
+            j->world.sleeping, passport_world_busy(&j->world));
+        passport_world_handle(&j->world, event, j->now);
+        passport_world_tick(&j->world, j->now, key != KEY_NONE && key != KEY_INVALID);
+    }
+}
+static void journey_tap(journey_t *j, passport_key_t key) {
+    journey_frames(j, key, 100);
+    journey_frames(j, KEY_NONE, 50);
+}
+static void journey_tests(void) {
+    journey_t j = {0};
+    passport_input_init(&j.input);
+    passport_world_init(&j.world, 0);
+    restore(&j.world, true, 0);
+    journey_tap(&j, KEY_OK);
+    assert(j.world.dialog == DIALOG_WELCOME);
+    journey_tap(&j, KEY_OK);
+    assert(j.world.dialog == DIALOG_NONE);
+    journey_frames(&j, KEY_LEFT, 800);
+    assert(j.world.transitioning && j.world.camera_x < HOUSE_X && j.world.camera_x > 0);
+    journey_frames(&j, KEY_NONE, 700);
+    assert(j.world.scene == SCENE_GARDEN && j.world.camera_x == 0);
+    journey_tap(&j, KEY_RIGHT);
+    assert(j.world.focus[SCENE_GARDEN] == 1);
+    j.world.day = 0;
+    journey_tap(&j, KEY_OK);
+    assert(j.world.watering && j.world.record.total == 0);
+    journey_frames(&j, KEY_RIGHT, 1900); /* Held during watering: no replay. */
+    passport_growth_t record;
+    assert(passport_world_take_water_save(&j.world, &record) && record.total == 1);
+    passport_world_water_saved(&j.world, false, j.now);
+    assert(j.world.dialog == DIALOG_WATER_FAILED && j.world.record.total == 0);
+    journey_frames(&j, KEY_NONE, 50);
+    journey_tap(&j, KEY_OK);
+    assert(passport_world_take_water_save(&j.world, &record) && record.total == 1);
+    passport_world_water_saved(&j.world, true, j.now);
+    assert(j.world.dialog == DIALOG_WATER_DONE && j.world.record.total == 1);
+    journey_tap(&j, KEY_OK);
+    journey_frames(&j, KEY_NONE, 100);
+    assert(!j.world.transitioning && j.world.scene == SCENE_GARDEN);
+    journey_frames(&j, KEY_RIGHT, 800);
+    journey_frames(&j, KEY_NONE, 700);
+    assert(j.world.scene == SCENE_HOUSE && j.world.camera_x == HOUSE_X);
+    assert(j.world.focus[SCENE_GARDEN] == 1 && j.world.focus[SCENE_HOUSE] == 0);
+    journey_frames(&j, KEY_NONE, STANDBY_MS);
+    assert(j.world.sleeping);
+    journey_frames(&j, KEY_LEFT, 1600); /* Wake hold must not also leave home. */
+    journey_frames(&j, KEY_NONE, 50);
+    assert(!j.world.sleeping && !j.world.transitioning && j.world.scene == SCENE_HOUSE);
+    journey_tap(&j, KEY_OK);
+    assert(j.world.dialog == DIALOG_WELCOME && j.world.record.total == 1);
+    journey_tap(&j, KEY_OK);
+    journey_frames(&j, KEY_LEFT, 800);
+    journey_frames(&j, KEY_NONE, 700);
+    journey_frames(&j, KEY_NONE, STANDBY_MS);
+    assert(j.world.sleeping && j.world.scene == SCENE_GARDEN);
+    journey_tap(&j, KEY_OK); /* Wake OK must not water the selected can. */
+    assert(!j.world.sleeping && !j.world.watering && j.world.dialog == DIALOG_NONE);
+    assert(j.world.record.total == 1);
+    journey_tap(&j, KEY_OK);
+    assert(j.world.watering && j.world.water_target.total == 2);
+}
+
+static void offline_clock_tests(void) {
+    passport_world_t w;
+    passport_world_init(&w, 0);
+    passport_growth_t record = {.total = 4, .today = 4, .daily = 4, .growth = 4,
+        .phase_seconds = 86340, .runtime_seconds = 86340};
+    passport_world_storage_loaded(&w, true, &record);
+    passport_world_clock_tick(&w, 59999);
+    assert(!w.water_save_pending && w.record.daily == 4);
+    passport_world_clock_tick(&w, 60000);
+    assert(w.water_save_pending && w.save_is_clock);
+    assert(passport_world_take_water_save(&w, &record));
+    assert(record.daily == 0 && record.today == 0 && record.growth == 4);
+    passport_world_clock_tick(&w, 61000);
+    passport_world_water_saved(&w, false, 61000);
+    passport_world_t asleep = w;
+    passport_world_tick(&asleep, 61000 + STANDBY_MS, false);
+    assert(asleep.sleeping && asleep.dialog == DIALOG_WATER_FAILED);
+    passport_world_handle(&asleep, INPUT_WAKE, 61001 + STANDBY_MS);
+    assert(!asleep.sleeping && asleep.dialog == DIALOG_WATER_FAILED);
+    passport_world_handle(&asleep, OK_SHORT, 61002 + STANDBY_MS);
+    assert(passport_world_take_water_save(&asleep, &record) && record.runtime_seconds == 86400);
+    passport_world_handle(&w, LEFT_LONG, 61001);
+    assert(w.dialog == DIALOG_WATER_FAILED && !w.transitioning);
+    w.day = 20261008;
+    passport_world_clock_tick(&w, 62000);
+    passport_world_handle(&w, OK_SHORT, 62001);
+    assert(passport_world_take_water_save(&w, &record) && !record.day && record.runtime_seconds == 86400);
+    passport_world_water_saved(&w, true, 62002);
+    assert(w.clock_pending_ms == 2000 && w.record.daily == 0 && w.dialog == DIALOG_NONE);
+    passport_world_clock_tick(&w, 62300); /* Pending time remains after the frozen acknowledgement. */
+    assert(passport_world_take_water_save(&w, &record));
+    assert(record.runtime_seconds == 86402 && record.clock_mode == CLOCK_BRIDGED);
+    passport_world_water_saved(&w, true, 62300);
+    assert(w.clock_pending_ms == 300 && w.last_activity == 62001);
+    passport_world_tick(&w, 122001, false);
+    assert(w.sleeping); /* Background clock saves cannot keep the backlight awake. */
+
+    record.clock_mode = CLOCK_LOCAL;
+    passport_world_init(&w, UINT32_MAX - 499);
+    passport_world_storage_loaded(&w, true, &record);
+    passport_world_clock_tick(&w, 500);
+    assert(w.clock_pending_ms == 1000); /* Monotonic tick wrap, not wall-clock subtraction. */
+    w.day = 0; w.scene = SCENE_GARDEN; w.focus[SCENE_GARDEN] = 1;
+    passport_world_handle(&w, OK_SHORT, 501);
+    assert(w.watering && w.water_target.total == 5 && w.save_clock_ms == 1000);
+    passport_world_clock_tick(&w, 2301);
+    passport_world_tick(&w, 2301, false);
+    assert(passport_world_take_water_save(&w, &record) && record.runtime_seconds == 86403);
+    passport_world_water_saved(&w, true, 2302);
+    assert(w.clock_pending_ms == 1801 && w.record.growth == 5 && w.record.daily == 1);
 }
 
 static void record_tests(void) {
@@ -235,7 +403,19 @@ static void record_tests(void) {
 }
 
 int main(void) {
-    input_tests(); world_tests(); watering_tests(); record_tests();
+    input_tests(); transition_release_tests(); world_tests(); watering_tests(); journey_tests(); offline_clock_tests(); record_tests();
+    passport_world_t w; passport_world_init(&w, 0);
+    w.momo = HOME_SLEEP; passport_world_handle(&w, OK_SHORT, 1);
+    assert(w.dialog == DIALOG_SLEEP); passport_world_handle(&w, OK_SHORT, 2);
+    assert(w.dialog == DIALOG_NONE && w.momo == HOME_SLEEP);
+    passport_growth_t record = {0}; passport_world_storage_loaded(&w, true, &record);
+    w.momo = OUT; passport_world_handle(&w, OK_SHORT, 3); assert(w.dialog == DIALOG_OUT);
+    passport_world_handle(&w, LEFT_LONG, 4); passport_world_tick(&w, 654, false);
+    passport_world_handle(&w, RIGHT_SHORT, 655); passport_world_handle(&w, OK_SHORT, 656);
+    assert(w.watering && w.momo == OUT); passport_world_tick(&w, 2456, false);
+    assert(passport_world_take_water_save(&w, &record) && record.total == 1);
+    passport_world_water_saved(&w, true, 2457);
+    assert(w.record.growth == 1 && w.record.total == 1 && w.momo == OUT);
     puts("Passport input/world tests: PASS");
     return 0;
 }

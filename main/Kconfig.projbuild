@@ -1,0 +1,10 @@
+menu "Cottage development"
+    config COTTAGE_SIMULATOR_NETWORK
+        bool "Connect to the FoloToy simulator host bridge"
+        default n
+        help
+            Development-only firmware: connect to the open Emulator Host Bridge
+            access point at startup, using RAM-only Wi-Fi configuration. Forget
+            disconnects until setup is requested or the simulator restarts.
+            Do not enable this option for physical-device firmware.
+endmenu

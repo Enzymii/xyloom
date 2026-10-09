@@ -1,0 +1,34 @@
+--- a/public/app.js
++++ b/public/app.js
+@@ -531,6 +531,19 @@
+   );
+ }
+
++// Local Cottage adapter: cycles-based demo gestures can exceed Cottage's hold
++// threshold while its quiet scene is idle. Preserve actual ADC press/release.
++let cottageTapQueue = Promise.resolve();
++function cottageTap(key) {
++  cottageTapQueue = cottageTapQueue.then(() => new Promise((resolve) => {
++    runtime.setButton(key, true);
++    setTimeout(() => {
++      runtime.setButton(key, false);
++      setTimeout(resolve, 30);
++    }, 30);
++  }));
++  return currentRuntimeState === "running";
++}
+ function dispatchButtonEvent(key, event, visible = true) {
+   let delivered = true;
+   if (event === "PRESS") {
+@@ -538,7 +551,10 @@
+   } else if (event === "LONG" && key !== "POWER") {
+     delivered = runtime.setButton(key, true);
+   } else if (["CLICK", "DOUBLE"].includes(event) && key !== "POWER") {
+-    delivered = runtime.sendButtonGesture(key, event);
++    if (/cottage/i.test(activeFirmwareName)) {
++      delivered = cottageTap(key);
++      if (event === "DOUBLE") cottageTap(key);
++    } else delivered = runtime.sendButtonGesture(key, event);
+   }
+   if (visible) {
+     const labels = {
