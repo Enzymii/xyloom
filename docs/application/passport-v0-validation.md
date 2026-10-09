@@ -250,3 +250,22 @@ Synthetic test NVS records additionally exercised offline 19:01 night/HOME_IDLE 
 - Paired documentation: root README, assets README, vision, roadmap, architecture and this validation record. Earlier offline/network batch files remain part of the accumulated working changes.
 
 Next: morning simulator acceptance, then explicitly authorized physical testing with the normal image: cold boot, three keys/wake, both pans, offline five cups/reboot, real Wi-Fi setup/reconnect, life scenes and stored-data preservation. Cloud sync, Journal, postcards, collection, reports and custom characters remain deferred.
+
+## Initial physical acceptance — 2026-10-09
+
+The owner explicitly authorized commit, push and flashing. Implementation commit `2658014` was pushed to `feature/cottage-watering`. The previously validated normal archive was used without rebuilding after the commit: its embedded version remains `d849764-dirty`, SDK `v5.5.3`. This identifies the pre-commit build of the implemented source; it is not a newly built `2658014` artifact.
+
+Device: COM3, ESP32-C3 revision v1.1, 8 MB Flash, USB Serial/JTAG. The existing partition table was read and matched the target exactly: NVS `0x9000` / `0x6000`, PHY `0xF000` / `0x1000`, factory `0x10000` / `0x7F0000`. Only bootloader at `0x0`, partition table at `0x8000` and application at `0x10000` were written; all three transfer hashes verified. No full-chip erase, NVS write, PHY write or firmware readback was performed. Stored Wi-Fi settings remained usable.
+
+The archive's full-image SHA-256 is `98a46c48653bc0833e65caac53d96d318158dc151c9baf2a5a33cd2d952c5bcd`; matching ELF SHA-256 is `7a7ddf8f34fb756c0a4bda11733f2f9b53075e1a31f524224385bbb73e7c22c2`. Archive verification passed before segmented flashing. The full merged image itself was not written.
+
+A bounded 45-second serial observation after reset matched ELF prefix `7a7ddf8f3`, saw one boot, BSP/application startup, retained real Wi-Fi connection, and SNTP synchronization at approximately 5.9 seconds. No panic, abort, watchdog, brownout, backtrace or reboot loop was detected. Startup free heap was 189,860 bytes and largest block 114,688 bytes before networking; these do not establish steady-state or peak memory headroom. The battery IC was detected and its configured profile matched. A late-window disconnect/setup-AP transition was logged; its cause was not established and it does not pass reconnection acceptance. The serial port was released afterward. Raw logs and personal network identifiers remain local and untracked.
+
+After being asked to enter the garden, water and return home, the owner reported normal display and controls. This is owner-reported basic interaction acceptance, not direct visual inspection or a complete device test matrix.
+
+- Build: PASS — previously completed normal and simulator full gates under ESP-IDF 5.5.3; the flashed normal artifact was independently verified. No firmware source changed during this acceptance recording.
+- Host tests: PASS — previous complete static/host and LVGL rendering checks; documentation-only follow-up is checked again before commit.
+- Device tests: PASS — limited to matching-artifact startup, retained real Wi-Fi/SNTP, and owner-reported basic display/navigation/watering/return. Full Milestone A and local MVP hardware acceptance remain open.
+- Unverified: physical offline cold boot, watering/quota persistence after reboot or sudden power loss, fifth-cup cap and growth boundaries, standby/backlight/first-wake behavior, new provisioning and reconnect, clock/quota/outing rollover, detailed font/color/sleep-sprite inspection and sustained memory/stack headroom.
+
+Updated files: this validation record and the roadmap, both language pairs. Next: physical offline cold boot and persistence, then quota/stage limits and standby/wake; keep cloud and future candidates deferred.
