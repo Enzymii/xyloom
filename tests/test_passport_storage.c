@@ -99,7 +99,45 @@ static bool save(uint32_t total) {
     return passport_storage_save(&next, 20261001, true);
 }
 
+static void restart_date_worker_tests(void) {
+    passport_growth_t saved = {.total = 15, .today = 3, .day = 20261008,
+        .growth = 12, .daily = 3, .clock_mode = CLOCK_CALENDAR}, clock;
+    passport_growth_encode(disk, &saved); disk[4] = 3; exists = true;
+    boot(); run(); passport_storage_result_t r = result();
+    assert(r.success && r.record.daily == 3 && r.record.day == 20261008);
+    assert(passport_growth_clock(&r.record, 0, 6, &clock));
+    commit_error = TEST_STORAGE_FAILURE;
+    assert(passport_storage_save(&clock, 0, false)); run(); result(); r = result();
+    assert(!r.success && disk[4] == 3);
+    commit_error = ESP_OK;
+    assert(passport_storage_save(&clock, 0, false)); run(); result(); r = result();
+    assert(r.success && r.record.clock_mode == CLOCK_AWAITING && disk[4] == 4);
+    boot(); run(); r = result(); /* Waiting state survives another cold boot. */
+    assert(r.success && r.record.daily == 3 && r.record.phase_seconds == 6);
+    assert(passport_growth_clock(&r.record, 20261009, 0, &clock));
+    commit_error = TEST_STORAGE_FAILURE;
+    assert(passport_storage_save(&clock, 20261009, false)); run(); result(); r = result();
+    assert(!r.success && passport_growth_decode(disk, disk_size, &saved) && saved.daily == 3);
+    commit_error = ESP_OK;
+    assert(passport_storage_save(&clock, 20261009, false)); run(); result(); r = result();
+    assert(r.success && !r.record.daily && r.record.growth == 12 && r.record.total == 15);
+    assert(passport_storage_save(&clock, 20261009, false)); run(); result(); r = result();
+    assert(r.success && writes == 2); /* Acknowledgement retry writes nothing. */
+    assert(passport_growth_drink(&clock, 20261009, &clock));
+    assert(passport_storage_save(&clock, 20261009, true)); run(); result(); r = result();
+    assert(r.success && r.record.daily == 1 && r.record.growth == 13);
+    boot(); run(); r = result(); saved = r.record;
+    assert(passport_growth_clock(&saved, 0, 6, &clock));
+    assert(passport_storage_save(&clock, 0, false)); run(); result(); r = result();
+    assert(r.success);
+    assert(passport_growth_clock(&clock, 20261009, 0, &clock));
+    assert(passport_storage_save(&clock, 20261009, false)); run(); result(); r = result();
+    assert(r.success && r.record.daily == 1 && r.record.total == 16);
+    exists = false;
+}
+
 int main(void) {
+    restart_date_worker_tests();
     boot(); assert(save(1)); run();
     passport_storage_result_t r = result();
     assert(r.loaded && r.success && r.record.total == 0);
@@ -177,11 +215,11 @@ int main(void) {
     r = result(); assert(r.success && !r.life_ready && r.record.total == 6);
     r = result(); assert(r.life_saved && !r.success && writes == 0 && life_disk[4] == 2);
 
-    disk[4] = 4; /* Unknown version must not reset or overwrite the record. */
+    disk[4] = 5; /* Unknown version must not reset or overwrite the record. */
     boot(); passport_growth_t invalid_request = {.total = 1, .today = 1, .day = 20261001, .growth = 1, .daily = 1};
     assert(passport_storage_save(&invalid_request, 20261001, true)); run();
     r = result(); assert(!r.success && r.loaded);
-    r = result(); assert(!r.success && writes == 0 && disk[4] == 4);
+    r = result(); assert(!r.success && writes == 0 && disk[4] == 5);
 
     init_error = TEST_STORAGE_FAILURE;
     boot();

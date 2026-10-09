@@ -7,6 +7,70 @@
 #include <stdio.h>
 #include <string.h>
 
+static void restart_date_tests(void) {
+    const passport_growth_t yesterday = {.total = 15, .today = 3, .day = 20261008,
+        .growth = 12, .daily = 3, .clock_mode = CLOCK_CALENDAR};
+    passport_growth_t s = yesterday, next;
+    uint8_t bytes[GROWTH_RECORD_SIZE];
+    /* A clock-only checkpoint before SNTP must not undate yesterday's cups. */
+    assert(passport_growth_clock(&s, 0, 6, &s));
+    passport_growth_encode(bytes, &s);
+    assert(passport_growth_decode(bytes, sizeof(bytes), &s));
+    assert(passport_growth_clock(&s, 20261009, 0, &s));
+    assert(s.daily == 0 && s.today == 0 && s.day == 20261009);
+    assert(s.total == yesterday.total && s.growth == yesterday.growth);
+    assert(passport_growth_drink(&s, 20261009, &s) && s.daily == 1 && s.growth == 13);
+    /* Repeated same-day restarts must not issue another allowance. */
+    assert(passport_growth_clock(&s, 0, 6, &s));
+    assert(passport_growth_clock(&s, 20261009, 0, &s));
+    assert(s.daily == 1 && s.today == 1 && s.growth == 13);
+    /* Actual offline cups still need the conservative bridge. */
+    s = yesterday;
+    assert(passport_growth_clock(&s, 0, 6, &s));
+    assert(passport_growth_drink(&s, 0, &s) && s.daily == 4);
+    assert(passport_growth_clock(&s, 20261009, 0, &s));
+    assert(s.daily == 4 && s.today == 4 && s.growth == 13);
+    /* Rollback cannot clear quota, and offline runtime still refreshes it. */
+    s = yesterday;
+    assert(passport_growth_clock(&s, 0, 6, &s));
+    assert(passport_growth_clock(&s, 20261007, 1, &s) && s.daily == 3);
+    assert(passport_growth_clock(&s, 20261009, 0, &s) && s.daily == 3);
+    s = yesterday;
+    assert(passport_growth_clock(&s, 0, 86399, &s) && s.daily == 3);
+    passport_growth_encode(bytes, &s);
+    assert(passport_growth_decode(bytes, sizeof(bytes), &s));
+    assert(passport_growth_clock(&s, 0, 1, &s) && !s.daily && !s.today);
+    assert(passport_growth_drink(&s, 0, &s) && s.daily == 1);
+    assert(passport_growth_clock(&s, 20261009, 0, &s) && s.daily == 1);
+    /* Version-3 calendar records retain date evidence on upgrade. */
+    passport_growth_encode(bytes, &yesterday); bytes[4] = 3;
+    assert(passport_growth_decode(bytes, sizeof(bytes), &s));
+    assert(passport_growth_clock(&s, 0, 6, &s));
+    assert(passport_growth_clock(&s, 20261009, 0, &s) && !s.daily);
+    /* Older local buckets have no proof that their cups predate this boot. */
+    s = yesterday; s.clock_mode = CLOCK_LOCAL;
+    passport_growth_encode(bytes, &s); bytes[4] = 3;
+    assert(passport_growth_decode(bytes, sizeof(bytes), &s));
+    assert(passport_growth_clock(&s, 20261009, 0, &next) && next.daily == 3);
+    /* Calendar arithmetic and waiting records stay valid across upgrades. */
+    const uint32_t dates[][2] = {{20240228, 20240229}, {20240229, 20240301},
+        {20261231, 20270101}, {20261008, 20261012}};
+    for (unsigned i = 0; i < sizeof(dates) / sizeof(dates[0]); ++i) {
+        s = yesterday; s.day = dates[i][0]; s.clock_mode = CLOCK_BRIDGED;
+        assert(passport_growth_clock(&s, 0, 6, &s));
+        assert(passport_growth_clock(&s, dates[i][1], 0, &s));
+        assert(!s.daily && s.total == yesterday.total && s.growth == yesterday.growth);
+    }
+    s = yesterday;
+    assert(passport_growth_clock(&s, 0, 6, &s));
+    passport_growth_encode(bytes, &s);
+    assert(bytes[4] == 4 && passport_growth_decode(bytes, sizeof(bytes), &next));
+    bytes[4] = 3; assert(!passport_growth_decode(bytes, sizeof(bytes), &next));
+    s.day = 0; assert(!passport_growth_valid(&s));
+    s.day = yesterday.day; s.phase_seconds = CLOCK_PERIOD_SECONDS;
+    assert(!passport_growth_valid(&s));
+}
+
 static void offline_tests(void) {
     passport_growth_t s = {0}, next, reboot;
     uint8_t bytes[GROWTH_RECORD_SIZE];
@@ -39,9 +103,9 @@ static void offline_tests(void) {
     assert(passport_growth_clock(&s, 20261009, 1, &s));
     assert(s.clock_mode == CLOCK_BRIDGED && s.daily == 2 && s.growth == 11);
     assert(passport_growth_clock(&s, 0, 10, &s));
-    assert(s.clock_mode == CLOCK_LOCAL && s.daily == 2 && s.phase_seconds == 10);
+    assert(s.clock_mode == CLOCK_AWAITING && s.daily == 2 && s.phase_seconds == 10);
     assert(passport_growth_clock(&s, 20261012, 0, &s));
-    assert(s.daily == 2 && s.clock_mode == CLOCK_BRIDGED); /* Cold boot cannot date the offline cups. */
+    assert(s.daily == 0 && s.clock_mode == CLOCK_CALENDAR); /* No new offline cup: the saved bucket is dated. */
     s.runtime_seconds = UINT64_MAX;
     assert(!passport_growth_clock(&s, 0, 1, &next));
     s = (passport_growth_t){.phase_seconds = 86400};
@@ -54,10 +118,11 @@ static void offline_tests(void) {
     assert(reboot.growth == 4 && reboot.daily == 4 && reboot.clock_mode == CLOCK_CALENDAR);
     assert(passport_growth_drink(&reboot, 0, &next) && next.growth == 4 && next.today == 5);
     for (size_t i = 0; i < 12; ++i) assert(!passport_growth_decode(bytes, i, &reboot));
-    bytes[4] = 4; assert(!passport_growth_decode(bytes, sizeof(bytes), &reboot));
+    bytes[4] = 5; assert(!passport_growth_decode(bytes, sizeof(bytes), &reboot));
 }
 
 int main(void) {
+    restart_date_tests();
     offline_tests();
     const uint8_t ap4[] = {192,168,4,1};
     const uint8_t ap6[] = {0,0,0,0,0,0,0,0,0,0,255,255,192,168,4,1};

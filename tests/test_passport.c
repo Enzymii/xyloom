@@ -331,6 +331,29 @@ static void journey_tests(void) {
     assert(j.world.watering && j.world.water_target.total == 2);
 }
 
+static void restart_date_tests(void) {
+    passport_world_t w;
+    passport_world_init(&w, 0);
+    passport_growth_t record = {.total = 15, .today = 3, .day = 20261008,
+        .growth = 12, .daily = 3, .clock_mode = CLOCK_CALENDAR};
+    passport_world_storage_loaded(&w, true, &record);
+    passport_world_clock_tick(&w, 1000);
+    assert(passport_world_take_water_save(&w, &record) && w.save_is_clock);
+    assert(record.clock_mode == CLOCK_AWAITING && record.daily == 3);
+    passport_world_water_saved(&w, true, 1000);
+    w.day = 20261009;
+    passport_world_clock_tick(&w, 1010);
+    assert(passport_world_take_water_save(&w, &record) && record.daily == 0);
+    assert(record.total == 15 && record.growth == 12 && w.record.daily == 3);
+    passport_world_water_saved(&w, false, 1011);
+    assert(w.record.daily == 3 && w.dialog == DIALOG_WATER_FAILED);
+    passport_world_handle(&w, OK_SHORT, 1012);
+    assert(passport_world_take_water_save(&w, &record) && record.daily == 0);
+    passport_world_water_saved(&w, true, 1013);
+    assert(!w.record.daily && !w.record.today && w.dialog == DIALOG_NONE);
+    assert(w.record.growth == 12 && w.record.total == 15);
+}
+
 static void offline_clock_tests(void) {
     passport_world_t w;
     passport_world_init(&w, 0);
@@ -403,7 +426,7 @@ static void record_tests(void) {
 }
 
 int main(void) {
-    input_tests(); transition_release_tests(); world_tests(); watering_tests(); journey_tests(); offline_clock_tests(); record_tests();
+    input_tests(); transition_release_tests(); world_tests(); watering_tests(); journey_tests(); restart_date_tests(); offline_clock_tests(); record_tests();
     passport_world_t w; passport_world_init(&w, 0);
     w.momo = HOME_SLEEP; passport_world_handle(&w, OK_SHORT, 1);
     assert(w.dialog == DIALOG_SLEEP); passport_world_handle(&w, OK_SHORT, 2);

@@ -12,7 +12,7 @@ static uint32_t get(const uint8_t *b) {
 }
 void passport_growth_encode(uint8_t b[GROWTH_RECORD_SIZE], const passport_growth_t *s) {
     memset(b, 0, GROWTH_RECORD_SIZE);
-    memcpy(b, "XYWC", 4); b[4] = 3; b[5] = s->growth; b[6] = s->daily; b[7] = s->clock_mode;
+    memcpy(b, "XYWC", 4); b[4] = 4; b[5] = s->growth; b[6] = s->daily; b[7] = s->clock_mode;
     put(b + 8, s->total); put(b + 12, s->today); put(b + 16, s->day);
     put(b + 20, (uint32_t)s->runtime_seconds); put(b + 24, (uint32_t)(s->runtime_seconds >> 32));
     put(b + 28, s->phase_seconds);
@@ -28,7 +28,8 @@ bool passport_growth_decode(const uint8_t *b, size_t size, passport_growth_t *s)
         if (legacy) {
             if (b[7] || b[20] || b[21] || b[22] || b[23]) return false;
         } else {
-            if (size != GROWTH_RECORD_SIZE || b[4] != 3) return false;
+            if (size != GROWTH_RECORD_SIZE || (b[4] != 3 && b[4] != 4)) return false;
+            if (b[4] == 3 && b[7] > CLOCK_BRIDGED) return false;
             for (unsigned i = 32; i < GROWTH_RECORD_SIZE; ++i) if (b[i]) return false;
         }
         value.total = get(b + 8); value.today = get(b + 12); value.day = get(b + 16);

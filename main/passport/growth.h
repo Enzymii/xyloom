@@ -3,7 +3,8 @@
 #include <stdint.h>
 
 enum { GROWTH_DAILY_MAX = 4, GROWTH_BLOOM = 56 };
-enum { CLOCK_LOCAL, CLOCK_CALENDAR, CLOCK_BRIDGED, CLOCK_PERIOD_SECONDS = 86400 };
+enum { CLOCK_LOCAL, CLOCK_CALENDAR, CLOCK_BRIDGED, CLOCK_AWAITING,
+       CLOCK_PERIOD_SECONDS = 86400 };
 typedef struct {
     uint32_t total, today, day;
     uint8_t growth, daily;

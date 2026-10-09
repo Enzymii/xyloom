@@ -269,3 +269,37 @@ After being asked to enter the garden, water and return home, the owner reported
 - Unverified: physical offline cold boot, watering/quota persistence after reboot or sudden power loss, fifth-cup cap and growth boundaries, standby/backlight/first-wake behavior, new provisioning and reconnect, clock/quota/outing rollover, detailed font/color/sleep-sprite inspection and sustained memory/stack headroom.
 
 Updated files: this validation record and the roadmap, both language pairs. Next: physical offline cold boot and persistence, then quota/stage limits and standby/wake; keep cloud and future candidates deferred.
+
+## Reboot daily-quota correction (pre-flash checkpoint) — 2026-10-09
+
+The owner reported three already-used header drops immediately after a physical next-day boot. A pure host reproduction confirmed that a clock-only checkpoint before SNTP changed yesterday's calendar record to an undated local bucket; the subsequent next-day synchronization then carried its quota forward instead of refreshing it. The new regression failed on the prior implementation before the fix.
+
+Implemented a persisted awaiting-sync mode for previously dated records. Clock-only checkpoints retain the saved date; a later trusted date refreshes cycle cups and used drops while preserving lifetime cups and plant growth. Same-day restart keeps the allowance. A real offline drink, local 24-hour refresh or clock rollback still uses conservative local/bridge behavior. Watering remains available before synchronization, and no technical timing copy or UI panel was added.
+
+The 40-byte record advances to version 4 to represent awaiting mode explicitly. Versions 1/2/3 migrate on a successful existing transaction without erasure. Already-undated version-3 records lack enough evidence to recover cup dates and remain conservative; this fix does not forcibly clear the owner's current quota. Older firmware rejects version 4 and must preserve the record rather than erase it. Wi-Fi and life records and the partition layout are unchanged.
+
+- Build: PASS — complete normal-profile gate under ESP-IDF 5.5.3, exit 0, merged-image/layout checks and matching archive verification. Version `a3c42f7-dirty`; full image 2275088 bytes, SHA-256 `520198384699b36d00edbf1d3bc39228ab8c078b702ab5f9db8432a7890998ab`; app 2209552 bytes; matching ELF SHA-256 `35e62a4f7408df843383ddf33dcfc50b7fd140625ad66304b63bf28cfd374e93`. Archive: `build/firmware/520198384699b36d00edbf1d3bc39228ab8c078b702ab5f9db8432a7890998ab/`.
+- Host tests: PASS — daily restart, same-day anti-duplication, offline watering, 24-hour boundary with reboot, backward clocks, leap/month/year and skipped-day boundaries, version-3 migration/invalid records, actual storage-worker failure/retry/idempotence and world commit/retry behavior. Static gate passes. Actual LVGL checks pass with 44 snapshots: the header keeps three filled drops while awaiting sync and clears them only after the forward-date commit; pixel assertions and visual inspection pass, and plant stage is retained.
+- Device tests: NOT RUN — this new artifact was not flashed. Read-only enumeration found COM1 only, with no Passport USB serial device. The previous artifact's basic device PASS is historical and does not validate this correction.
+- Unverified: this exact image's physical next-day restart/SNTP refresh, same-day restart retention, existing-record migration, actual offline watering, sudden power loss and calendar/runtime boundaries. No new simulator firmware or emulator execution is claimed for this correction; the rendering check runs host LVGL.
+
+Updated files: `main/passport/growth.c`, `growth.h`, `growth_record.c`; `tests/test_passport_growth.c`, `test_passport_storage.c`, `test_passport.c`, `tests/passport_render/render.c`; paired architecture, roadmap and validation records. No commit, push or flash occurred in this correction. Next: connect the Passport with a data-capable cable and authorize testing of this exact normal artifact using segmented writes at `0x0`, `0x8000`, `0x10000`, excluding NVS/PHY; do not flash the full merged image over stored data.
+
+## Authorized refresh and reset acceptance — 2026-10-09
+
+The owner subsequently authorized flashing the correction and overwriting the incorrect old records. Data impact was explained before writing: Cottage watering/life records and saved Wi-Fi share NVS, so a complete refresh resets all of them and requires Wi-Fi setup again. The owner later authorized committing and pushing the correction after confirmation.
+
+Read-only discovery identified COM3 as USB VID `303A`, PID `1001`; esptool confirmed ESP32-C3 revision v1.1 and 8 MB Flash. The same normal archive was independently reverified, including full-image SHA-256 `520198384699b36d00edbf1d3bc39228ab8c078b702ab5f9db8432a7890998ab` and matching ELF SHA-256 `35e62a4f7408df843383ddf33dcfc50b7fd140625ad66304b63bf28cfd374e93`. Its NVS/PHY padding at `0x9000–0xFFFF` was confirmed all `0xFF`. No rebuild changed the approved artifact.
+
+The approved merged image was written at `0x0`: 2,275,088 bytes, with erase range `0x00000000–0x0022BFFF`; transfer hash verification passed and the device reset. This was the authorized complete refresh, not the earlier proposed NVS-preserving segmented write. No whole-chip erase or firmware readback was performed.
+
+A 45-second reset/startup observation matched version `a3c42f7-dirty`, SDK `v5.5.3` and ELF prefix `35e62a4f7`. One boot and application readiness were observed, with no crash markers or watering-storage errors. Startup free internal heap was 190,256 bytes, largest block 114,688 bytes; this is pre-network startup evidence, not sustained memory acceptance. No SNTP was observed after resetting saved Wi-Fi. Neither provisioning nor real reconnection was accepted in this window. The serial port was closed and released. Raw logs remain local and untracked.
+
+The owner entered the garden and confirmed all four drops empty and the plant at seed stage. This accepts the requested visible reset on the flashed correction; it does not prove forward-calendar rollover or same-day restart behavior.
+
+- Build: PASS — the correction's complete normal gate and independently verified archive above.
+- Host tests: PASS — static/host regressions and 44 actual LVGL snapshots above; final documentation checks are rerun before commit.
+- Device tests: PASS — limited to matching-image startup without detected errors and owner-reported empty drops/seed after the authorized reset.
+- Unverified: real Wi-Fi setup/SNTP, next-day synchronization and rollover, same-day quota persistence, offline watering/reboot/power-loss recovery, migration of old records (the owner chose reset), 24-hour runtime boundaries and sustained memory/stack headroom.
+
+Next: configure Wi-Fi from Cottage's Status page, then verify one watering and same-day restart retention; complete next-day acceptance separately. Cloud and future features remain deferred.

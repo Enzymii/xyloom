@@ -153,6 +153,21 @@ int main(void) {
     world.day = 20261001; world.record.day = world.day; world.record.total = 56;
     world.record.today = world.record.daily = 3; world.record.growth = 20;
     world.dialog = DIALOG_NONE; save(display, "daily-three.ppm", &world);
+    uint16_t used_drop = s_frame[37 * 240 + 93];
+    passport_growth_t rollover;
+    world.day = 0;
+    passport_world_clock_tick(&world, 1000);
+    assert(passport_world_take_water_save(&world, &rollover));
+    passport_world_water_saved(&world, true, 1000);
+    save(display, "quota-awaiting-sync.ppm", &world);
+    assert(world.record.clock_mode == CLOCK_AWAITING && s_frame[37 * 240 + 93] == used_drop);
+    world.day = 20261002;
+    passport_world_clock_tick(&world, 1010);
+    assert(passport_world_take_water_save(&world, &rollover));
+    passport_world_water_saved(&world, true, 1010);
+    save(display, "quota-next-day.ppm", &world);
+    assert(!world.record.daily && world.record.total == 56 && world.record.growth == 20);
+    assert(s_frame[37 * 240 + 93] != used_drop);
     /* Stationary screen must stop flushing, even as input timestamps change. */
     unsigned flushed = s_flushes;
     for (unsigned i = 0; i < 300; ++i) {

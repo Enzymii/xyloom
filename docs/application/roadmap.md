@@ -49,3 +49,15 @@ Local B1/B2/B3 are implemented and covered by host tests and bounded simulator f
 The owner authorized commit, push and flashing. The normal archived image was flashed to the connected ESP32-C3 after verifying the existing partition table, with NVS and PHY excluded from writes. A bounded 45-second observation confirmed the matching ELF, application startup, retained real Wi-Fi connection and SNTP, with one boot and no crash markers. After being asked to enter the garden, water and return home, the owner reported normal display and controls. This is basic device acceptance; the full matrix remains open. Artifact identity and limits are in the [validation record](passport-v0-validation.md).
 
 Next small checks, in order: physical offline cold boot and reboot persistence; fifth-cup growth cap and stage boundaries; standby/backlight and first-wake consumption; then real provisioning/reconnect and time/quota/outing rollover. Fix any reproducible failure before adding features. Cloud and future candidates remain deferred.
+
+## Reboot quota correction (pre-flash checkpoint): 2026-10-09
+
+The owner reported old used drops on a physical next-day boot. Source now preserves a dated bucket while waiting for SNTP, clears it on a later trusted date, and keeps same-day/offline anti-duplication. Version-4 records migrate existing versions without erasure; already-undated old buckets stay conservative. Host logic, actual storage-worker retry, and LVGL header checks pass; the normal complete build gate passes. This new artifact still needs physical acceptance. The earlier code commit and device PASS above remain historical; this correction is uncommitted and unflashed. Exact image identities and remaining checks are in the [validation record](passport-v0-validation.md).
+
+Next: authorize this artifact's segmented device flash after connecting USB, then verify next-day synchronization and same-day persistence before continuing other acceptance tasks. The quiet cultivation UI and future-feature deferrals remain unchanged.
+
+## Correction flashed and records reset: 2026-10-09
+
+The owner authorized overwriting incorrect records, so the independently verified normal correction image was written as a complete refresh to COM3. NVS/PHY and saved Wi-Fi were reset as explained before writing. Transfer verification passed; a bounded 45-second startup matched the ELF with one boot, no crash markers and no watering-storage errors. The owner confirmed empty header drops and seed stage in the garden. The serial port is released. The owner then authorized commit and push. Exact identity and bounded acceptance are in the [validation record](passport-v0-validation.md).
+
+Next acceptance: configure Wi-Fi/SNTP again, water once and check same-day reboot persistence; then verify next-day refresh and offline power-loss/runtime boundaries. Visible reset is accepted; automatic daily behavior still needs hardware evidence. Future-feature deferrals remain unchanged.
